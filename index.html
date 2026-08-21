@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<title>Bitácora</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- React (no build step needed) -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #141310; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+
+/* =========================================================
+   PASO OBLIGATORIO: pegá acá tus credenciales de Supabase.
+   Las conseguís en tu proyecto Supabase > Settings > API.
+   ========================================================= */
+const SUPABASE_URL = "https://mvhyzbhveathjsqkvhgl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aHl6Ymh2ZWF0aGpzcWt2aGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTc5NDYsImV4cCI6MjEwMjg5Mzk0Nn0.iANXf-9VNPHdYaJKR8PO8fCniUY7RCl3w-2O55ctjj4";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ---- Storage helpers (using Supabase table "kv_store": key text, value jsonb) ----
+async function loadKey(key, fallback) {
+  try {
+    const { data, error } = await supabase.from('kv_store').select('value').eq('key', key).maybeSingle();
+    if (error || !data) return fallback;
+    return data.value;
+  } catch {
+    return fallback;
+  }
+}
+async function saveKey(key, value) {
+  try {
+    await supabase.from('kv_store').upsert({ key, value });
+  } catch (e) {
+    console.error('Error guardando', key, e);
+  }
+}
+
+// ---- Routine definition ----
+const ROUTINE = {
+  1: { label: 'Día 1', exercises: [
+    { id: 'd1-sentadilla', name: 'Sentadilla', sets: 4, repRange: '6-8' },
+    { id: 'd1-press-banca', name: 'Press banca', sets: 3, repRange: '6-8' },
+    { id: 'd1-remo', name: 'Remo con barra/mancuerna', sets: 3, repRange: '8-10' },
+    { id: 'd1-press-militar', name: 'Press militar', sets: 2, repRange: '8-10' },
+    { id: 'd1-curl', name: 'Curl bíceps', sets: 2, repRange: '10-12' },
+  ]},
+  2: { label: 'Día 2', exercises: [
+    { id: 'd2-pesomuerto', name: 'Peso muerto (o rumano)', sets: 3, repRange: '6-8' },
+    { id: 'd2-press-inclinado', name: 'Press inclinado / fondos asistidos', sets: 3, repRange: '6-10' },
+    { id: 'd2-dominadas', name: 'Dominadas asistidas / jalón al pecho', sets: 3, repRange: '8-10' },
+    { id: 'd2-zancadas', name: 'Zancadas o prensa', sets: 2, repRange: '10-12' },
+    { id: 'd2-triceps', name: 'Tríceps en polea / fondos asistidos', sets: 2, repRange: '10-12' },
+  ]},
+  3: { label: 'Día 3', exercises: [
+    { id: 'd3-sentadilla-v', name: 'Sentadilla o prensa (variante)', sets: 3, repRange: '8-10' },
+    { id: 'd3-press-banca', name: 'Press banca o inclinado', sets: 3, repRange: '8-10' },
+    { id: 'd3-remo', name: 'Remo en máquina o TRX', sets: 3, repRange: '8-10' },
+    { id: 'd3-press-militar', name: 'Press militar mancuernas', sets: 2, repRange: '10-12' },
+    { id: 'd3-super', name: 'Superserie: curl + tríceps', sets: 2, repRange: '12' },
+  ]},
+};
+const CORE_EXERCISE = { id: 'core-opcional', name: 'Core (abdominales / plancha)', sets: 3, repRange: 'a elección' };
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+const fmtDateShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+const daysBetween = (isoA, isoB) => Math.round((new Date(isoB + 'T00:00:00') - new Date(isoA + 'T00:00:00')) / 86400000);
+
+function emptyLogForDay(dayKey) {
+  const log = {};
+  [...ROUTINE[dayKey].exercises, CORE_EXERCISE].forEach((ex) => {
+    log[ex.id] = Array.from({ length: ex.sets }, () => ({ weight: '', reps: '' }));
+  });
+  return log;
+}
+
+function lastPerformance(sessions, exId) {
+  for (const s of sessions) {
+    if (s.entries[exId]) {
+      const filled = s.entries[exId].filter((x) => x.weight !== '' || x.reps !== '');
+      if (filled.length > 0) {
+        const maxWeight = Math.max(...filled.map((x) => parseFloat(x.weight) || 0));
+        const best = filled.find((x) => parseFloat(x.weight) === maxWeight) || filled[0];
+        return { date: s.date, weight: best.weight, reps: best.reps };
+      }
+    }
+  }
+  return null;
+}
+
+function GymTracker() {
+  const [sessions, setSessions] = useState(null);
+  const [bodyweights, setBodyweights] = useState(null);
+  const [view, setView] = useState('log');
+  const [selectedDay, setSelectedDay] = useState(1);
+  const [date, setDate] = useState(todayISO());
+  const [entries, setEntries] = useState(emptyLogForDay(1));
+  const [note, setNote] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null);
+  const [editingSessionId, setEditingSessionId] = useState(null);
+  const [progressTab, setProgressTab] = useState('dashboard');
+  const [progressExerciseId, setProgressExerciseId] = useState('d1-sentadilla');
+  const [bwInput, setBwInput] = useState('');
+  const [bwDate, setBwDate] = useState(todayISO());
+  const [configError, setConfigError] = useState(false);
+
+  useEffect(() => {
+    if (SUPABASE_URL.includes('PEGA_ACA') || SUPABASE_ANON_KEY.includes('PEGA_ACA')) {
+      setConfigError(true);
+      return;
+    }
+    (async () => {
+      const [s, bw] = await Promise.all([loadKey('sessions', []), loadKey('bodyweights', [])]);
+      setSessions(s || []);
+      setBodyweights(bw || []);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (editingSessionId) return;
+    setEntries(emptyLogForDay(selectedDay));
+    setNote('');
+    setSaved(false);
+  }, [selectedDay]);
+
+  const updateSet = (exId, setIdx, field, value) => {
+    setEntries((prev) => ({ ...prev, [exId]: prev[exId].map((s, i) => (i === setIdx ? { ...s, [field]: value } : s)) }));
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    const cleaned = {};
+    let hasData = false;
+    Object.entries(entries).forEach(([exId, sets]) => {
+      const filled = sets.filter((s) => s.weight !== '' || s.reps !== '');
+      if (filled.length > 0) { cleaned[exId] = sets; hasData = true; }
+    });
+    if (!hasData) return;
+
+    let next;
+    if (editingSessionId) {
+      next = (sessions || []).map((s) => s.id === editingSessionId ? { ...s, date, day: selectedDay, entries: cleaned, note: note.trim() } : s);
+    } else {
+      const existingIdx = (sessions || []).findIndex((s) => s.date === date && s.day === selectedDay);
+      if (existingIdx !== -1) {
+        next = (sessions || []).map((s, i) => i === existingIdx ? { ...s, entries: cleaned, note: note.trim() || s.note } : s);
+      } else {
+        next = [{ id: `${date}-${selectedDay}-${Date.now()}`, date, day: selectedDay, entries: cleaned, note: note.trim() }, ...(sessions || [])];
+      }
+    }
+    next = next.sort((a, b) => (a.date < b.date ? 1 : -1));
+    setSessions(next);
+    await saveKey('sessions', next);
+    setSaved(true);
+  };
+
+  const handleEditSession = (session) => {
+    setEditingSessionId(session.id);
+    setDate(session.date);
+    setSelectedDay(session.day);
+    const base = emptyLogForDay(session.day);
+    Object.entries(session.entries).forEach(([exId, sets]) => {
+      if (base[exId]) base[exId] = sets.map((s) => ({ weight: s.weight ?? '', reps: s.reps ?? '' }));
+    });
+    setEntries(base);
+    setNote(session.note || '');
+    setSaved(false);
+    setView('log');
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    const next = (sessions || []).filter((s) => s.id !== sessionId);
+    setSessions(next);
+    await saveKey('sessions', next);
+    if (editingSessionId === sessionId) { setEditingSessionId(null); setEntries(emptyLogForDay(selectedDay)); setNote(''); }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSessionId(null);
+    setEntries(emptyLogForDay(selectedDay));
+    setNote('');
+    setSaved(false);
+  };
+
+  const handleSaveBodyweight = async () => {
+    const val = parseFloat(bwInput);
+    if (!val || val <= 0) return;
+    const filtered = (bodyweights || []).filter((b) => b.date !== bwDate);
+    const next = [...filtered, { date: bwDate, weight: val }].sort((a, b) => (a.date < b.date ? -1 : 1));
+    setBodyweights(next);
+    await saveKey('bodyweights', next);
+    setBwInput('');
+  };
+
+  const allExercises = Object.values(ROUTINE).flatMap((d) => d.exercises);
+  const exerciseById = Object.fromEntries([...allExercises, CORE_EXERCISE].map((e) => [e.id, e]));
+
+  const progressData = (sessions || [])
+    .filter((s) => s.entries[progressExerciseId])
+    .map((s) => ({ date: s.date, maxWeight: Math.max(0, ...s.entries[progressExerciseId].map((x) => parseFloat(x.weight) || 0)) }))
+    .filter((p) => p.maxWeight > 0)
+    .sort((a, b) => (a.date > b.date ? 1 : -1));
+
+  if (configError) {
+    return (
+      <div style={styles.loadingScreen}>
+        <div style={{ ...styles.loadingText, maxWidth: 320, textAlign: 'center', lineHeight: 1.6 }}>
+          FALTA CONFIGURAR SUPABASE.<br/>Editá el archivo index.html y pegá tu URL y ANON KEY donde dice "PEGA_ACA".
+        </div>
+      </div>
+    );
+  }
+
+  if (sessions === null || bodyweights === null) {
+    return <div style={styles.loadingScreen}><div style={styles.loadingText}>CARGANDO</div></div>;
+  }
+
+  return (
+    <div style={styles.app}>
+      <header style={styles.header}>
+        <div>
+          <div style={styles.kicker}>REGISTRO DE ENTRENAMIENTO</div>
+          <h1 style={styles.title}>BITÁCORA</h1>
+        </div>
+        <div style={styles.headerRule} />
+      </header>
+
+      <nav style={styles.nav}>
+        <NavButton active={view === 'log'} onClick={() => setView('log')} label="Registrar" />
+        <NavButton active={view === 'history'} onClick={() => setView('history')} label="Historial" />
+        <NavButton active={view === 'progress'} onClick={() => setView('progress')} label="Progreso" />
+        <NavButton active={view === 'guide'} onClick={() => setView('guide')} label="Guía" />
+      </nav>
+
+      {view === 'log' && (
+        <LogView date={date} setDate={setDate} selectedDay={selectedDay} setSelectedDay={setSelectedDay}
+          entries={entries} updateSet={updateSet} note={note} setNote={setNote} handleSave={handleSave}
+          saved={saved} sessions={sessions} editingSessionId={editingSessionId} handleCancelEdit={handleCancelEdit} />
+      )}
+      {view === 'history' && (
+        <HistoryView sessions={sessions} exerciseById={exerciseById} expandedHistoryId={expandedHistoryId}
+          setExpandedHistoryId={setExpandedHistoryId} handleEditSession={handleEditSession} handleDeleteSession={handleDeleteSession} />
+      )}
+      {view === 'progress' && (
+        <ProgressView allExercises={allExercises} progressTab={progressTab} setProgressTab={setProgressTab}
+          progressExerciseId={progressExerciseId} setProgressExerciseId={setProgressExerciseId} progressData={progressData}
+          sessions={sessions} bodyweights={bodyweights} bwInput={bwInput} setBwInput={setBwInput}
+          bwDate={bwDate} setBwDate={setBwDate} handleSaveBodyweight={handleSaveBodyweight} />
+      )}
+      {view === 'guide' && <GuideView />}
+    </div>
+  );
+}
+
+function NavButton({ active, onClick, label }) {
+  return <button onClick={onClick} style={{ ...styles.navButton, ...(active ? styles.navButtonActive : {}) }}>{label}</button>;
+}
+
+function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSet, note, setNote, handleSave, saved, sessions, editingSessionId, handleCancelEdit }) {
+  const day = ROUTINE[selectedDay];
+  return (
+    <div style={styles.section}>
+      {editingSessionId && (
+        <div style={styles.editBanner}>
+          <span>EDITANDO SESIÓN EXISTENTE</span>
+          <button onClick={handleCancelEdit} style={styles.editBannerCancel}>Cancelar</button>
+        </div>
+      )}
+      <div style={styles.controlsRow}>
+        <div style={styles.dayTabs}>
+          {[1, 2, 3].map((d) => (
+            <button key={d} disabled={!!editingSessionId} onClick={() => setSelectedDay(d)}
+              style={{ ...styles.dayTab, ...(selectedDay === d ? styles.dayTabActive : {}), ...(editingSessionId ? styles.dayTabDisabled : {}) }}>
+              {ROUTINE[d].label}
+            </button>
+          ))}
+        </div>
+        <input type="date" value={date} disabled={!!editingSessionId} onChange={(e) => setDate(e.target.value)} style={styles.dateInput} />
+      </div>
+
+      <div style={styles.exerciseList}>
+        {day.exercises.map((ex, idx) => {
+          const last = lastPerformance(sessions, ex.id);
+          return (
+            <div key={ex.id} style={styles.exerciseCard}>
+              <div style={styles.exerciseHeader}>
+                <span style={styles.exerciseNum}>{String(idx + 1).padStart(2, '0')}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.exerciseName}>{ex.name}</div>
+                  <div style={styles.exerciseMeta}>{ex.sets} series · {ex.repRange} reps</div>
+                </div>
+              </div>
+              {last && (
+                <div style={styles.lastPerf}>
+                  <span style={styles.lastPerfLabel}>ÚLTIMA VEZ</span>
+                  <span style={styles.lastPerfValue}>{last.weight}kg × {last.reps} · {fmtDateShort(last.date)}</span>
+                </div>
+              )}
+              <div style={styles.setsGrid}>
+                <div style={styles.setsGridHeader}>
+                  <span></span><span style={styles.setsGridHeaderCell}>KG</span><span style={styles.setsGridHeaderCell}>REPS</span>
+                </div>
+                {entries[ex.id]?.map((set, setIdx) => (
+                  <div key={setIdx} style={styles.setRow}>
+                    <span style={styles.setLabel}>Serie {setIdx + 1}</span>
+                    <input type="number" inputMode="decimal" value={set.weight} onChange={(e) => updateSet(ex.id, setIdx, 'weight', e.target.value)} placeholder="—" style={styles.setInput} />
+                    <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(ex.id, setIdx, 'reps', e.target.value)} placeholder="—" style={styles.setInput} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        <div style={{ ...styles.exerciseCard, ...styles.coreCard }}>
+          <div style={styles.exerciseHeader}>
+            <span style={styles.exerciseNum}>+</span>
+            <div style={{ flex: 1 }}>
+              <div style={styles.exerciseName}>{CORE_EXERCISE.name}</div>
+              <div style={styles.exerciseMeta}>opcional · series x reps o segundos</div>
+            </div>
+          </div>
+          <div style={styles.setsGrid}>
+            <div style={styles.setsGridHeader}>
+              <span></span><span style={styles.setsGridHeaderCell}>EJERCICIO</span><span style={styles.setsGridHeaderCell}>REPS/SEG</span>
+            </div>
+            {entries[CORE_EXERCISE.id]?.map((set, setIdx) => (
+              <div key={setIdx} style={styles.setRow}>
+                <span style={styles.setLabel}>Serie {setIdx + 1}</span>
+                <input type="text" value={set.weight} onChange={(e) => updateSet(CORE_EXERCISE.id, setIdx, 'weight', e.target.value)} placeholder="ej: plancha" style={styles.setInput} />
+                <input type="text" value={set.reps} onChange={(e) => updateSet(CORE_EXERCISE.id, setIdx, 'reps', e.target.value)} placeholder="ej: 30s" style={styles.setInput} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.noteCard}>
+        <span style={styles.noteLabel}>NOTA DE LA SESIÓN (opcional)</span>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: me costó la última serie, subir peso próxima vez..." style={styles.noteInput} rows={2} />
+      </div>
+
+      <button onClick={handleSave} style={styles.saveButton}>
+        {saved ? `✓ ${editingSessionId ? 'CAMBIOS GUARDADOS' : 'GUARDADO'}` : (editingSessionId ? 'GUARDAR CAMBIOS' : 'GUARDAR SESIÓN')}
+      </button>
+    </div>
+  );
+}
+
+function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHistoryId, handleEditSession, handleDeleteSession }) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  if (sessions.length === 0) {
+    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Registrá tu primera sesión para verla acá.</div></div>;
+  }
+  return (
+    <div style={styles.section}>
+      <div style={styles.historyList}>
+        {sessions.map((s) => {
+          const isOpen = expandedHistoryId === s.id;
+          const exCount = Object.keys(s.entries).length;
+          const isConfirming = confirmDeleteId === s.id;
+          return (
+            <div key={s.id} style={styles.historyCard}>
+              <button style={styles.historyCardHeader} onClick={() => setExpandedHistoryId(isOpen ? null : s.id)}>
+                <div style={styles.historyCardLeft}>
+                  <span style={styles.historyDayTag}>{ROUTINE[s.day].label}</span>
+                  <span style={styles.historyDate}>{fmtDate(s.date)}</span>
+                </div>
+                <div style={styles.historyCardRight}>
+                  <span style={styles.historyExCount}>{exCount} ejerc.</span>
+                  <span>{isOpen ? '▲' : '▼'}</span>
+                </div>
+              </button>
+              {isOpen && (
+                <div style={styles.historyDetail}>
+                  {Object.entries(s.entries).map(([exId, sets]) => (
+                    <div key={exId} style={styles.historyExRow}>
+                      <div style={styles.historyExName}>{exerciseById[exId]?.name || exId}</div>
+                      <div style={styles.historySets}>
+                        {sets.filter((x) => x.weight !== '' || x.reps !== '').map((x, i) => (
+                          <span key={i} style={styles.historySetChip}>{x.weight || '—'}{exId === 'core-opcional' ? '' : 'kg'} × {x.reps || '—'}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {s.note && (
+                    <div style={styles.historyNote}>
+                      <span style={styles.historyNoteLabel}>NOTA</span>
+                      <span style={styles.historyNoteText}>{s.note}</span>
+                    </div>
+                  )}
+                  <div style={styles.historyActions}>
+                    {!isConfirming ? (
+                      <>
+                        <button style={styles.historyActionEdit} onClick={() => handleEditSession(s)}>Editar</button>
+                        <button style={styles.historyActionDelete} onClick={() => setConfirmDeleteId(s.id)}>Eliminar</button>
+                      </>
+                    ) : (
+                      <>
+                        <span style={styles.historyConfirmText}>¿Eliminar esta sesión?</span>
+                        <button style={styles.historyActionDelete} onClick={() => { handleDeleteSession(s.id); setConfirmDeleteId(null); }}>Sí, eliminar</button>
+                        <button style={styles.historyActionEdit} onClick={() => setConfirmDeleteId(null)}>Cancelar</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ProgressView({ allExercises, progressTab, setProgressTab, progressExerciseId, setProgressExerciseId, progressData, sessions, bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight }) {
+  return (
+    <div style={styles.section}>
+      <div style={styles.subTabs}>
+        <button onClick={() => setProgressTab('dashboard')} style={{ ...styles.subTab, ...(progressTab === 'dashboard' ? styles.subTabActive : {}) }}>Resumen</button>
+        <button onClick={() => setProgressTab('exercise')} style={{ ...styles.subTab, ...(progressTab === 'exercise' ? styles.subTabActive : {}) }}>Ejercicio</button>
+        <button onClick={() => setProgressTab('bodyweight')} style={{ ...styles.subTab, ...(progressTab === 'bodyweight' ? styles.subTabActive : {}) }}>Peso corporal</button>
+      </div>
+
+      {progressTab === 'dashboard' && <DashboardTab sessions={sessions} />}
+
+      {progressTab === 'exercise' && (
+        <>
+          <select value={progressExerciseId} onChange={(e) => setProgressExerciseId(e.target.value)} style={styles.exerciseSelect}>
+            {allExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+          </select>
+          {progressData.length === 0 ? (
+            <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registrá este ejercicio para ver tu progreso acá.</div></div>
+          ) : (
+            <BarChartCard data={progressData.map((p) => ({ date: p.date, value: p.maxWeight }))} unit="KG" label="PESO MÁXIMO POR SESIÓN" />
+          )}
+        </>
+      )}
+
+      {progressTab === 'bodyweight' && (
+        <BodyweightTab bodyweights={bodyweights} bwInput={bwInput} setBwInput={setBwInput} bwDate={bwDate} setBwDate={setBwDate} handleSaveBodyweight={handleSaveBodyweight} />
+      )}
+    </div>
+  );
+}
+
+function DashboardTab({ sessions }) {
+  if (sessions.length === 0) {
+    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registrá sesiones para ver tu resumen acá.</div></div>;
+  }
+  const totalSessions = sessions.length;
+  const today = todayISO();
+  const last7 = sessions.filter((s) => { const d = daysBetween(s.date, today); return d <= 7 && d >= 0; }).length;
+  let totalSets = 0;
+  sessions.forEach((s) => Object.values(s.entries).forEach((sets) => { totalSets += sets.filter((x) => x.weight !== '' || x.reps !== '').length; }));
+  const lastSession = sessions[0];
+  const daysSinceLast = daysBetween(lastSession.date, today);
+
+  let streakWeeks = 0;
+  {
+    const sorted = [...sessions].map((s) => s.date).sort((a, b) => (a < b ? 1 : -1));
+    let cursor = new Date(today + 'T00:00:00');
+    for (let w = 0; w < 52; w++) {
+      const weekStart = new Date(cursor); weekStart.setDate(weekStart.getDate() - 7);
+      const hasSession = sorted.some((d) => { const dd = new Date(d + 'T00:00:00'); return dd > weekStart && dd <= cursor; });
+      if (hasSession) { streakWeeks++; cursor = weekStart; } else break;
+    }
+  }
+
+  return (
+    <div style={styles.dashGrid}>
+      <div style={styles.dashCard}><span style={styles.dashValue}>{totalSessions}</span><span style={styles.dashLabel}>SESIONES TOTALES</span></div>
+      <div style={styles.dashCard}><span style={styles.dashValue}>{last7}</span><span style={styles.dashLabel}>ÚLTIMOS 7 DÍAS</span></div>
+      <div style={styles.dashCard}><span style={styles.dashValue}>{streakWeeks}</span><span style={styles.dashLabel}>SEMANAS SEGUIDAS</span></div>
+      <div style={styles.dashCard}><span style={styles.dashValueSmall}>{totalSets}</span><span style={styles.dashLabel}>SERIES REGISTRADAS</span></div>
+      <div style={{ ...styles.dashCard, gridColumn: '1 / -1' }}>
+        <span style={styles.dashLabel}>ÚLTIMA SESIÓN</span>
+        <span style={styles.dashValueSmall}>{ROUTINE[lastSession.day].label} · {fmtDate(lastSession.date)}{daysSinceLast > 0 && <span style={styles.dashSubtle}> ({daysSinceLast} día{daysSinceLast !== 1 ? 's' : ''} atrás)</span>}</span>
+      </div>
+    </div>
+  );
+}
+
+function BodyweightTab({ bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight }) {
+  const chartData = bodyweights.map((b) => ({ date: b.date, value: b.weight }));
+  const latest = bodyweights[bodyweights.length - 1];
+  const first = bodyweights[0];
+  const delta = latest && first ? (latest.weight - first.weight).toFixed(1) : null;
+  return (
+    <div>
+      <div style={styles.bwInputCard}>
+        <div style={styles.bwInputRow}>
+          <input type="date" value={bwDate} onChange={(e) => setBwDate(e.target.value)} style={{ ...styles.dateInput, flex: 1 }} />
+          <input type="number" inputMode="decimal" value={bwInput} onChange={(e) => setBwInput(e.target.value)} placeholder="Peso (kg)" style={styles.bwWeightInput} />
+        </div>
+        <button onClick={handleSaveBodyweight} style={styles.bwSaveButton}>REGISTRAR PESO</button>
+      </div>
+      {bodyweights.length === 0 ? (
+        <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Cargá tu peso para empezar a ver la evolución.</div></div>
+      ) : (
+        <>
+          {latest && (
+            <div style={styles.bwSummaryRow}>
+              <div style={styles.bwSummaryItem}><span style={styles.dashLabel}>ACTUAL</span><span style={styles.dashValueSmall}>{latest.weight} kg</span></div>
+              {delta !== null && bodyweights.length > 1 && (
+                <div style={styles.bwSummaryItem}>
+                  <span style={styles.dashLabel}>DESDE EL PRIMER REGISTRO</span>
+                  <span style={{ ...styles.dashValueSmall, color: delta < 0 ? '#7a9b6f' : delta > 0 ? '#c65d2e' : undefined }}>{delta > 0 ? '+' : ''}{delta} kg</span>
+                </div>
+              )}
+            </div>
+          )}
+          <BarChartCard data={chartData} unit="KG" label="EVOLUCIÓN DE PESO CORPORAL" />
+        </>
+      )}
+    </div>
+  );
+}
+
+function BarChartCard({ data, unit, label }) {
+  const values = data.map((p) => p.value);
+  const maxW = Math.max(1, ...values);
+  const minW = Math.min(...values, maxW);
+  const range = maxW - minW || 1;
+  return (
+    <div style={styles.chartCard}>
+      <div style={styles.chartHeaderRow}><span style={styles.chartLabel}>{label}</span><span style={styles.chartUnit}>{unit}</span></div>
+      <div style={styles.chartArea}>
+        {data.map((p, i) => {
+          const heightPct = ((p.value - minW) / range) * 70 + 20;
+          return (
+            <div key={i} style={styles.chartBarWrap}>
+              <span style={styles.chartValue}>{p.value}</span>
+              <div style={{ ...styles.chartBar, height: `${heightPct}%` }} />
+              <span style={styles.chartDate}>{fmtDateShort(p.date)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GuideView() {
+  return (
+    <div style={styles.section}>
+      <GuideCard title="CALENTAMIENTO" subtitle="Antes de la primera serie pesada de cada ejercicio">
+        <GuideItem>2-3 series crecientes con peso liviano/moderado antes de tu serie de trabajo (ej: 40% → 60% → 80% del peso pesado, 5-8 reps cada una).</GuideItem>
+        <GuideItem>No hace falta cargarlas en el registro — no aportan a la progresión, solo preparan articulaciones y sistema nervioso.</GuideItem>
+        <GuideItem>5-10 min de movilidad articular general antes de empezar, especialmente si vas a hacer sentadilla o peso muerto.</GuideItem>
+      </GuideCard>
+      <GuideCard title="DESCANSO ENTRE SERIES" subtitle="Depende del ejercicio y la intensidad">
+        <GuideItem><b>Compuestos pesados</b> (sentadilla, peso muerto, press banca): 2-3 min entre series de trabajo.</GuideItem>
+        <GuideItem><b>Accesorios</b> (curl, tríceps, zancadas): 60-90 seg alcanza.</GuideItem>
+        <GuideItem>Si te falta tiempo, hacé superseries con ejercicios que no compitan por el mismo grupo muscular.</GuideItem>
+      </GuideCard>
+      <GuideCard title="CÓMO SUBIR EL PESO" subtitle="Sobrecarga progresiva">
+        <GuideItem>Cuando completás todas las series en el rango alto de reps, subís peso la próxima semana.</GuideItem>
+        <GuideItem>Subida típica: 2.5-5 kg en compuestos grandes, 1-2.5 kg en ejercicios de brazo/hombro.</GuideItem>
+        <GuideItem>Dejá 1-3 reps en reserva por serie — no llegues al fallo en cada una.</GuideItem>
+        <GuideItem>Si un peso te cuesta 2-3 sesiones seguidas, quedate ahí una semana más antes de forzar el aumento.</GuideItem>
+      </GuideCard>
+      <GuideCard title="OTROS PUNTOS CLAVE" subtitle="Lo que más impacta en tu objetivo">
+        <GuideItem>Proteína: apuntá a 160-180g/día.</GuideItem>
+        <GuideItem>Déficit calórico leve (10-15%), no agresivo.</GuideItem>
+        <GuideItem>Sueño (7-9h) y reducir alcohol impactan más en grasa abdominal que cualquier suplemento.</GuideItem>
+        <GuideItem>La consistencia semanal pesa más que la rutina "perfecta".</GuideItem>
+      </GuideCard>
+    </div>
+  );
+}
+function GuideCard({ title, subtitle, children }) {
+  return (
+    <div style={styles.guideCard}>
+      <div style={styles.guideCardHeader}>
+        <div><div style={styles.guideCardTitle}>{title}</div><div style={styles.guideCardSubtitle}>{subtitle}</div></div>
+      </div>
+      <div style={styles.guideList}>{children}</div>
+    </div>
+  );
+}
+function GuideItem({ children }) {
+  return <div style={styles.guideItem}><span style={styles.guideBullet}>—</span><span style={styles.guideItemText}>{children}</span></div>;
+}
+
+const COLORS = {
+  bg: '#141310', bgCard: '#1c1a16', bgCardAlt: '#211f1a', iron: '#3a362e', ironLight: '#4d483d',
+  ember: '#c65d2e', emberDim: '#8a4523', paper: '#e8e3d6', paperDim: '#a8a294', paperFaint: '#6b6759',
+};
+
+const styles = {
+  app: { minHeight: '100vh', background: COLORS.bg, color: COLORS.paper, fontFamily: "'Oswald', sans-serif", paddingBottom: 40, maxWidth: 480, margin: '0 auto' },
+  loadingScreen: { minHeight: '100vh', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, letterSpacing: '0.2em' },
+  header: { padding: '28px 20px 0' },
+  kicker: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.15em', color: COLORS.ember, marginBottom: 6 },
+  title: { fontSize: 34, fontWeight: 700, letterSpacing: '0.02em', margin: 0, color: COLORS.paper },
+  headerRule: { height: 3, background: `linear-gradient(90deg, ${COLORS.ember} 0%, ${COLORS.iron} 40%)`, marginTop: 18 },
+  nav: { display: 'flex', gap: 0, padding: '0 20px', marginTop: 20, borderBottom: `1px solid ${COLORS.iron}` },
+  navButton: { background: 'none', border: 'none', color: COLORS.paperDim, fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '10px 14px 12px', cursor: 'pointer', borderBottom: '3px solid transparent', marginBottom: -1 },
+  navButtonActive: { color: COLORS.paper, borderBottom: `3px solid ${COLORS.ember}` },
+  section: { padding: '20px 20px 0' },
+  controlsRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' },
+  dayTabs: { display: 'flex', gap: 6 },
+  dayTab: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, padding: '8px 12px', cursor: 'pointer', letterSpacing: '0.03em' },
+  dayTabActive: { background: COLORS.ember, borderColor: COLORS.ember, color: '#1a1410', fontWeight: 700 },
+  dayTabDisabled: { opacity: 0.4, cursor: 'not-allowed' },
+  dateInput: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, color: COLORS.paper, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, padding: '8px 10px', colorScheme: 'dark' },
+  exerciseList: { display: 'flex', flexDirection: 'column', gap: 14 },
+  exerciseCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, padding: 16 },
+  coreCard: { borderStyle: 'dashed', borderColor: COLORS.ironLight },
+  exerciseHeader: { display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 },
+  exerciseNum: { fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.ember, fontWeight: 700 },
+  exerciseName: { fontSize: 17, fontWeight: 600, color: COLORS.paper, lineHeight: 1.2 },
+  exerciseMeta: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.paperFaint, marginTop: 3, letterSpacing: '0.03em' },
+  lastPerf: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, padding: '6px 10px', marginBottom: 12 },
+  lastPerfLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '0.08em', color: COLORS.paperFaint },
+  lastPerfValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.paperDim },
+  setsGrid: { display: 'flex', flexDirection: 'column', gap: 6 },
+  setsGridHeader: { display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: 8, padding: '0 2px 4px' },
+  setsGridHeaderCell: { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.paperFaint, letterSpacing: '0.1em', textAlign: 'center' },
+  setRow: { display: 'grid', gridTemplateColumns: '70px 1fr 1fr', gap: 8, alignItems: 'center' },
+  setLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.paperDim },
+  setInput: { background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, color: COLORS.paper, fontFamily: "'JetBrains Mono', monospace", fontSize: 15, padding: '9px 6px', textAlign: 'center', width: '100%', boxSizing: 'border-box' },
+  noteCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, padding: 14, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 },
+  noteLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '0.08em', color: COLORS.paperFaint },
+  noteInput: { background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, color: COLORS.paper, fontFamily: "'Oswald', sans-serif", fontSize: 14, padding: '10px', resize: 'vertical', boxSizing: 'border-box', width: '100%' },
+  saveButton: { width: '100%', background: COLORS.ember, border: 'none', color: '#1a1410', fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: '0.08em', padding: '16px 0', marginTop: 22, cursor: 'pointer' },
+  emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: 10, textAlign: 'center' },
+  emptyTitle: { fontFamily: "'JetBrains Mono', monospace", fontSize: 13, letterSpacing: '0.15em', color: COLORS.paperDim, marginTop: 4 },
+  emptyText: { fontSize: 14, color: COLORS.paperFaint, maxWidth: 240 },
+  historyList: { display: 'flex', flexDirection: 'column', gap: 10 },
+  historyCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}` },
+  historyCardHeader: { width: '100%', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', cursor: 'pointer', color: COLORS.paper },
+  historyCardLeft: { display: 'flex', alignItems: 'center', gap: 10 },
+  historyDayTag: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: COLORS.emberDim, color: COLORS.paper, padding: '3px 8px', letterSpacing: '0.05em' },
+  historyDate: { fontSize: 15, fontWeight: 500 },
+  historyCardRight: { display: 'flex', alignItems: 'center', gap: 8, color: COLORS.paperFaint },
+  historyExCount: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11 },
+  historyDetail: { padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${COLORS.iron}`, paddingTop: 12 },
+  historyExRow: { display: 'flex', flexDirection: 'column', gap: 5 },
+  historyExName: { fontSize: 13, fontWeight: 600, color: COLORS.paperDim },
+  historySets: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  historySetChip: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, padding: '4px 8px', color: COLORS.paper },
+  historyNote: { display: 'flex', flexDirection: 'column', gap: 4, background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, padding: '8px 10px', marginTop: 4 },
+  historyNoteLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '0.08em', color: COLORS.ember },
+  historyNoteText: { fontSize: 13, color: COLORS.paperDim, fontStyle: 'italic' },
+  historyActions: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, paddingTop: 10, borderTop: `1px solid ${COLORS.iron}` },
+  historyActionEdit: { background: 'none', border: `1px solid ${COLORS.ironLight}`, color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '6px 12px', cursor: 'pointer' },
+  historyActionDelete: { background: 'none', border: `1px solid ${COLORS.ember}`, color: COLORS.ember, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '6px 12px', cursor: 'pointer' },
+  historyConfirmText: { fontSize: 12, color: COLORS.paperDim, marginRight: 4 },
+  subTabs: { display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' },
+  subTab: { display: 'flex', alignItems: 'center', gap: 6, background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '8px 12px', cursor: 'pointer', letterSpacing: '0.03em' },
+  subTabActive: { background: COLORS.ember, borderColor: COLORS.ember, color: '#1a1410', fontWeight: 700 },
+  exerciseSelect: { width: '100%', background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, color: COLORS.paper, fontFamily: "'Oswald', sans-serif", fontSize: 15, padding: '12px 10px', marginBottom: 20, boxSizing: 'border-box' },
+  dashGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
+  dashCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
+  dashValue: { fontSize: 30, fontWeight: 700, color: COLORS.paper, fontFamily: "'Oswald', sans-serif" },
+  dashValueSmall: { fontSize: 16, fontWeight: 600, color: COLORS.paper },
+  dashLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '0.08em', color: COLORS.paperFaint },
+  dashSubtle: { color: COLORS.paperFaint, fontWeight: 400, fontSize: 13 },
+  bwInputCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, padding: 14, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 },
+  bwInputRow: { display: 'flex', gap: 8 },
+  bwWeightInput: { flex: 1, background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, color: COLORS.paper, fontFamily: "'JetBrains Mono', monospace", fontSize: 15, padding: '9px 10px', boxSizing: 'border-box' },
+  bwSaveButton: { background: COLORS.ember, border: 'none', color: '#1a1410', fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', padding: '10px 0', cursor: 'pointer' },
+  bwSummaryRow: { display: 'flex', gap: 10, marginBottom: 16 },
+  bwSummaryItem: { flex: 1, background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 },
+  chartCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, padding: '18px 14px' },
+  chartHeaderRow: { display: 'flex', justifyContent: 'space-between', marginBottom: 20 },
+  chartLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.1em', color: COLORS.paperFaint },
+  chartUnit: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.ember },
+  chartArea: { display: 'flex', alignItems: 'flex-end', gap: 10, height: 180, overflowX: 'auto', paddingBottom: 4 },
+  chartBarWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minWidth: 34, height: '100%' },
+  chartValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.paper, marginBottom: 6 },
+  chartBar: { width: 20, background: COLORS.ember, minHeight: 4 },
+  chartDate: { fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.paperFaint, marginTop: 8, textAlign: 'center' },
+  editBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: COLORS.emberDim, color: COLORS.paper, padding: '10px 14px', marginBottom: 14, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.06em' },
+  editBannerCancel: { background: 'none', border: `1px solid ${COLORS.paper}`, color: COLORS.paper, fontFamily: "'Oswald', sans-serif", fontSize: 12, padding: '4px 10px', cursor: 'pointer' },
+  guideCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, padding: 16, marginBottom: 14 },
+  guideCardHeader: { display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  guideCardTitle: { fontSize: 15, fontWeight: 700, letterSpacing: '0.04em', color: COLORS.paper },
+  guideCardSubtitle: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.paperFaint, marginTop: 2 },
+  guideList: { display: 'flex', flexDirection: 'column', gap: 9 },
+  guideItem: { display: 'flex', gap: 8, alignItems: 'flex-start' },
+  guideBullet: { color: COLORS.ember, fontWeight: 700, flexShrink: 0 },
+  guideItemText: { fontSize: 13.5, color: COLORS.paperDim, lineHeight: 1.5 },
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<GymTracker />);
+</script>
+</body>
+</html>
