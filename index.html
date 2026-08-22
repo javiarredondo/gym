@@ -67,12 +67,12 @@ const { useState, useEffect } = React;
 const SUPABASE_URL = "https://mvhyzbhveathjsqkvhgl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aHl6Ymh2ZWF0aGpzcWt2aGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTc5NDYsImV4cCI6MjEwMjg5Mzk0Nn0.iANXf-9VNPHdYaJKR8PO8fCniUY7RCl3w-2O55ctjj4";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ---- Storage helpers (using Supabase table "kv_store": key text, value jsonb) ----
 async function loadKey(key, fallback) {
   try {
-    const { data, error } = await supabase.from('kv_store').select('value').eq('key', key).maybeSingle();
+    const { data, error } = await supabaseClient.from('kv_store').select('value').eq('key', key).maybeSingle();
     if (error || !data) return fallback;
     return data.value;
   } catch {
@@ -81,7 +81,7 @@ async function loadKey(key, fallback) {
 }
 async function saveKey(key, value) {
   try {
-    await supabase.from('kv_store').upsert({ key, value });
+    await supabaseClient.from('kv_store').upsert({ key, value });
   } catch (e) {
     console.error('Error guardando', key, e);
   }
