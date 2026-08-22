@@ -5,31 +5,64 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Bitácora</title>
+<title>BitĂˇcora</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-
-<!-- React (no build step needed) -->
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<!-- Supabase client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #141310; }
+  #error-box { display:none; position:fixed; inset:0; background:#141310; color:#ff6b4a; font-family: monospace; font-size:13px; padding:20px; white-space:pre-wrap; word-break:break-word; z-index:9999; overflow:auto; line-height:1.6; }
 </style>
+<script>
+  function showError(msg) {
+    document.addEventListener('DOMContentLoaded', function () {
+      var box = document.getElementById('error-box');
+      box.style.display = 'block';
+      box.textContent = 'ERROR:\n\n' + msg + '\n\nSacale una foto a este texto y mandaselo a Claude.';
+    });
+    if (document.readyState !== 'loading') {
+      var box = document.getElementById('error-box');
+      if (box) {
+        box.style.display = 'block';
+        box.textContent = 'ERROR:\n\n' + msg + '\n\nSacale una foto a este texto y mandaselo a Claude.';
+      }
+    }
+  }
+  window.addEventListener('error', function (e) {
+    showError((e.message || 'Error desconocido') + '\n\nArchivo: ' + (e.filename || '?') + '\nLĂ­nea: ' + (e.lineno || '?'));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    showError('Promise rechazada: ' + (e.reason && e.reason.message ? e.reason.message : JSON.stringify(e.reason)));
+  });
+</script>
+
+<!-- React (no build step needed) -->
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" onerror="showError('No se pudo descargar React desde el CDN.')"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" onerror="showError('No se pudo descargar ReactDOM desde el CDN.')"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js" onerror="showError('No se pudo descargar Babel desde el CDN.')"></script>
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="showError('No se pudo descargar Supabase desde el CDN.')"></script>
 </head>
 <body>
 <div id="root"></div>
+<div id="error-box"></div>
+<script>
+  setTimeout(function () {
+    var root = document.getElementById('root');
+    var box = document.getElementById('error-box');
+    if (root && root.children.length === 0 && box.style.display !== 'block') {
+      showError('La app no cargĂł nada despuĂ©s de 6 segundos.\nEs probable que un recurso externo (React, Babel o Supabase) no se haya podido descargar â€” revisĂˇ la conexiĂłn o si algĂşn bloqueador de anuncios estĂˇ interfiriendo.');
+    }
+  }, 6000);
+</script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect } = React;
 
 /* =========================================================
-   PASO OBLIGATORIO: pegá acá tus credenciales de Supabase.
-   Las conseguís en tu proyecto Supabase > Settings > API.
+   PASO OBLIGATORIO: pegĂˇ acĂˇ tus credenciales de Supabase.
+   Las conseguĂ­s en tu proyecto Supabase > Settings > API.
    ========================================================= */
 const SUPABASE_URL = "https://mvhyzbhveathjsqkvhgl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aHl6Ymh2ZWF0aGpzcWt2aGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTc5NDYsImV4cCI6MjEwMjg5Mzk0Nn0.iANXf-9VNPHdYaJKR8PO8fCniUY7RCl3w-2O55ctjj4";
@@ -56,29 +89,29 @@ async function saveKey(key, value) {
 
 // ---- Routine definition ----
 const ROUTINE = {
-  1: { label: 'Día 1', exercises: [
+  1: { label: 'DĂ­a 1', exercises: [
     { id: 'd1-sentadilla', name: 'Sentadilla', sets: 4, repRange: '6-8' },
     { id: 'd1-press-banca', name: 'Press banca', sets: 3, repRange: '6-8' },
     { id: 'd1-remo', name: 'Remo con barra/mancuerna', sets: 3, repRange: '8-10' },
     { id: 'd1-press-militar', name: 'Press militar', sets: 2, repRange: '8-10' },
-    { id: 'd1-curl', name: 'Curl bíceps', sets: 2, repRange: '10-12' },
+    { id: 'd1-curl', name: 'Curl bĂ­ceps', sets: 2, repRange: '10-12' },
   ]},
-  2: { label: 'Día 2', exercises: [
+  2: { label: 'DĂ­a 2', exercises: [
     { id: 'd2-pesomuerto', name: 'Peso muerto (o rumano)', sets: 3, repRange: '6-8' },
     { id: 'd2-press-inclinado', name: 'Press inclinado / fondos asistidos', sets: 3, repRange: '6-10' },
-    { id: 'd2-dominadas', name: 'Dominadas asistidas / jalón al pecho', sets: 3, repRange: '8-10' },
+    { id: 'd2-dominadas', name: 'Dominadas asistidas / jalĂłn al pecho', sets: 3, repRange: '8-10' },
     { id: 'd2-zancadas', name: 'Zancadas o prensa', sets: 2, repRange: '10-12' },
-    { id: 'd2-triceps', name: 'Tríceps en polea / fondos asistidos', sets: 2, repRange: '10-12' },
+    { id: 'd2-triceps', name: 'TrĂ­ceps en polea / fondos asistidos', sets: 2, repRange: '10-12' },
   ]},
-  3: { label: 'Día 3', exercises: [
+  3: { label: 'DĂ­a 3', exercises: [
     { id: 'd3-sentadilla-v', name: 'Sentadilla o prensa (variante)', sets: 3, repRange: '8-10' },
     { id: 'd3-press-banca', name: 'Press banca o inclinado', sets: 3, repRange: '8-10' },
-    { id: 'd3-remo', name: 'Remo en máquina o TRX', sets: 3, repRange: '8-10' },
+    { id: 'd3-remo', name: 'Remo en mĂˇquina o TRX', sets: 3, repRange: '8-10' },
     { id: 'd3-press-militar', name: 'Press militar mancuernas', sets: 2, repRange: '10-12' },
-    { id: 'd3-super', name: 'Superserie: curl + tríceps', sets: 2, repRange: '12' },
+    { id: 'd3-super', name: 'Superserie: curl + trĂ­ceps', sets: 2, repRange: '12' },
   ]},
 };
-const CORE_EXERCISE = { id: 'core-opcional', name: 'Core (abdominales / plancha)', sets: 3, repRange: 'a elección' };
+const CORE_EXERCISE = { id: 'core-opcional', name: 'Core (abdominales / plancha)', sets: 3, repRange: 'a elecciĂłn' };
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -225,7 +258,7 @@ function GymTracker() {
     return (
       <div style={styles.loadingScreen}>
         <div style={{ ...styles.loadingText, maxWidth: 320, textAlign: 'center', lineHeight: 1.6 }}>
-          FALTA CONFIGURAR SUPABASE.<br/>Editá el archivo index.html y pegá tu URL y ANON KEY donde dice "PEGA_ACA".
+          FALTA CONFIGURAR SUPABASE.<br/>EditĂˇ el archivo index.html y pegĂˇ tu URL y ANON KEY donde dice "PEGA_ACA".
         </div>
       </div>
     );
@@ -240,7 +273,7 @@ function GymTracker() {
       <header style={styles.header}>
         <div>
           <div style={styles.kicker}>REGISTRO DE ENTRENAMIENTO</div>
-          <h1 style={styles.title}>BITÁCORA</h1>
+          <h1 style={styles.title}>BITĂ�CORA</h1>
         </div>
         <div style={styles.headerRule} />
       </header>
@@ -249,7 +282,7 @@ function GymTracker() {
         <NavButton active={view === 'log'} onClick={() => setView('log')} label="Registrar" />
         <NavButton active={view === 'history'} onClick={() => setView('history')} label="Historial" />
         <NavButton active={view === 'progress'} onClick={() => setView('progress')} label="Progreso" />
-        <NavButton active={view === 'guide'} onClick={() => setView('guide')} label="Guía" />
+        <NavButton active={view === 'guide'} onClick={() => setView('guide')} label="GuĂ­a" />
       </nav>
 
       {view === 'log' && (
@@ -282,7 +315,7 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
     <div style={styles.section}>
       {editingSessionId && (
         <div style={styles.editBanner}>
-          <span>EDITANDO SESIÓN EXISTENTE</span>
+          <span>EDITANDO SESIĂ“N EXISTENTE</span>
           <button onClick={handleCancelEdit} style={styles.editBannerCancel}>Cancelar</button>
         </div>
       )}
@@ -307,13 +340,13 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
                 <span style={styles.exerciseNum}>{String(idx + 1).padStart(2, '0')}</span>
                 <div style={{ flex: 1 }}>
                   <div style={styles.exerciseName}>{ex.name}</div>
-                  <div style={styles.exerciseMeta}>{ex.sets} series · {ex.repRange} reps</div>
+                  <div style={styles.exerciseMeta}>{ex.sets} series Â· {ex.repRange} reps</div>
                 </div>
               </div>
               {last && (
                 <div style={styles.lastPerf}>
-                  <span style={styles.lastPerfLabel}>ÚLTIMA VEZ</span>
-                  <span style={styles.lastPerfValue}>{last.weight}kg × {last.reps} · {fmtDateShort(last.date)}</span>
+                  <span style={styles.lastPerfLabel}>ĂšLTIMA VEZ</span>
+                  <span style={styles.lastPerfValue}>{last.weight}kg Ă— {last.reps} Â· {fmtDateShort(last.date)}</span>
                 </div>
               )}
               <div style={styles.setsGrid}>
@@ -323,8 +356,8 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
                 {entries[ex.id]?.map((set, setIdx) => (
                   <div key={setIdx} style={styles.setRow}>
                     <span style={styles.setLabel}>Serie {setIdx + 1}</span>
-                    <input type="number" inputMode="decimal" value={set.weight} onChange={(e) => updateSet(ex.id, setIdx, 'weight', e.target.value)} placeholder="—" style={styles.setInput} />
-                    <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(ex.id, setIdx, 'reps', e.target.value)} placeholder="—" style={styles.setInput} />
+                    <input type="number" inputMode="decimal" value={set.weight} onChange={(e) => updateSet(ex.id, setIdx, 'weight', e.target.value)} placeholder="â€”" style={styles.setInput} />
+                    <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(ex.id, setIdx, 'reps', e.target.value)} placeholder="â€”" style={styles.setInput} />
                   </div>
                 ))}
               </div>
@@ -337,7 +370,7 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
             <span style={styles.exerciseNum}>+</span>
             <div style={{ flex: 1 }}>
               <div style={styles.exerciseName}>{CORE_EXERCISE.name}</div>
-              <div style={styles.exerciseMeta}>opcional · series x reps o segundos</div>
+              <div style={styles.exerciseMeta}>opcional Â· series x reps o segundos</div>
             </div>
           </div>
           <div style={styles.setsGrid}>
@@ -356,12 +389,12 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
       </div>
 
       <div style={styles.noteCard}>
-        <span style={styles.noteLabel}>NOTA DE LA SESIÓN (opcional)</span>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: me costó la última serie, subir peso próxima vez..." style={styles.noteInput} rows={2} />
+        <span style={styles.noteLabel}>NOTA DE LA SESIĂ“N (opcional)</span>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: me costĂł la Ăşltima serie, subir peso prĂłxima vez..." style={styles.noteInput} rows={2} />
       </div>
 
       <button onClick={handleSave} style={styles.saveButton}>
-        {saved ? `✓ ${editingSessionId ? 'CAMBIOS GUARDADOS' : 'GUARDADO'}` : (editingSessionId ? 'GUARDAR CAMBIOS' : 'GUARDAR SESIÓN')}
+        {saved ? `âś“ ${editingSessionId ? 'CAMBIOS GUARDADOS' : 'GUARDADO'}` : (editingSessionId ? 'GUARDAR CAMBIOS' : 'GUARDAR SESIĂ“N')}
       </button>
     </div>
   );
@@ -370,7 +403,7 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
 function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHistoryId, handleEditSession, handleDeleteSession }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   if (sessions.length === 0) {
-    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Registrá tu primera sesión para verla acá.</div></div>;
+    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>RegistrĂˇ tu primera sesiĂłn para verla acĂˇ.</div></div>;
   }
   return (
     <div style={styles.section}>
@@ -388,7 +421,7 @@ function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHis
                 </div>
                 <div style={styles.historyCardRight}>
                   <span style={styles.historyExCount}>{exCount} ejerc.</span>
-                  <span>{isOpen ? '▲' : '▼'}</span>
+                  <span>{isOpen ? 'â–˛' : 'â–Ľ'}</span>
                 </div>
               </button>
               {isOpen && (
@@ -398,7 +431,7 @@ function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHis
                       <div style={styles.historyExName}>{exerciseById[exId]?.name || exId}</div>
                       <div style={styles.historySets}>
                         {sets.filter((x) => x.weight !== '' || x.reps !== '').map((x, i) => (
-                          <span key={i} style={styles.historySetChip}>{x.weight || '—'}{exId === 'core-opcional' ? '' : 'kg'} × {x.reps || '—'}</span>
+                          <span key={i} style={styles.historySetChip}>{x.weight || 'â€”'}{exId === 'core-opcional' ? '' : 'kg'} Ă— {x.reps || 'â€”'}</span>
                         ))}
                       </div>
                     </div>
@@ -417,8 +450,8 @@ function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHis
                       </>
                     ) : (
                       <>
-                        <span style={styles.historyConfirmText}>¿Eliminar esta sesión?</span>
-                        <button style={styles.historyActionDelete} onClick={() => { handleDeleteSession(s.id); setConfirmDeleteId(null); }}>Sí, eliminar</button>
+                        <span style={styles.historyConfirmText}>ÂżEliminar esta sesiĂłn?</span>
+                        <button style={styles.historyActionDelete} onClick={() => { handleDeleteSession(s.id); setConfirmDeleteId(null); }}>SĂ­, eliminar</button>
                         <button style={styles.historyActionEdit} onClick={() => setConfirmDeleteId(null)}>Cancelar</button>
                       </>
                     )}
@@ -450,9 +483,9 @@ function ProgressView({ allExercises, progressTab, setProgressTab, progressExerc
             {allExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
           </select>
           {progressData.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registrá este ejercicio para ver tu progreso acá.</div></div>
+            <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>RegistrĂˇ este ejercicio para ver tu progreso acĂˇ.</div></div>
           ) : (
-            <BarChartCard data={progressData.map((p) => ({ date: p.date, value: p.maxWeight }))} unit="KG" label="PESO MÁXIMO POR SESIÓN" />
+            <BarChartCard data={progressData.map((p) => ({ date: p.date, value: p.maxWeight }))} unit="KG" label="PESO MĂ�XIMO POR SESIĂ“N" />
           )}
         </>
       )}
@@ -466,7 +499,7 @@ function ProgressView({ allExercises, progressTab, setProgressTab, progressExerc
 
 function DashboardTab({ sessions }) {
   if (sessions.length === 0) {
-    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registrá sesiones para ver tu resumen acá.</div></div>;
+    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>RegistrĂˇ sesiones para ver tu resumen acĂˇ.</div></div>;
   }
   const totalSessions = sessions.length;
   const today = todayISO();
@@ -490,12 +523,12 @@ function DashboardTab({ sessions }) {
   return (
     <div style={styles.dashGrid}>
       <div style={styles.dashCard}><span style={styles.dashValue}>{totalSessions}</span><span style={styles.dashLabel}>SESIONES TOTALES</span></div>
-      <div style={styles.dashCard}><span style={styles.dashValue}>{last7}</span><span style={styles.dashLabel}>ÚLTIMOS 7 DÍAS</span></div>
+      <div style={styles.dashCard}><span style={styles.dashValue}>{last7}</span><span style={styles.dashLabel}>ĂšLTIMOS 7 DĂŤAS</span></div>
       <div style={styles.dashCard}><span style={styles.dashValue}>{streakWeeks}</span><span style={styles.dashLabel}>SEMANAS SEGUIDAS</span></div>
       <div style={styles.dashCard}><span style={styles.dashValueSmall}>{totalSets}</span><span style={styles.dashLabel}>SERIES REGISTRADAS</span></div>
       <div style={{ ...styles.dashCard, gridColumn: '1 / -1' }}>
-        <span style={styles.dashLabel}>ÚLTIMA SESIÓN</span>
-        <span style={styles.dashValueSmall}>{ROUTINE[lastSession.day].label} · {fmtDate(lastSession.date)}{daysSinceLast > 0 && <span style={styles.dashSubtle}> ({daysSinceLast} día{daysSinceLast !== 1 ? 's' : ''} atrás)</span>}</span>
+        <span style={styles.dashLabel}>ĂšLTIMA SESIĂ“N</span>
+        <span style={styles.dashValueSmall}>{ROUTINE[lastSession.day].label} Â· {fmtDate(lastSession.date)}{daysSinceLast > 0 && <span style={styles.dashSubtle}> ({daysSinceLast} dĂ­a{daysSinceLast !== 1 ? 's' : ''} atrĂˇs)</span>}</span>
       </div>
     </div>
   );
@@ -516,7 +549,7 @@ function BodyweightTab({ bodyweights, bwInput, setBwInput, bwDate, setBwDate, ha
         <button onClick={handleSaveBodyweight} style={styles.bwSaveButton}>REGISTRAR PESO</button>
       </div>
       {bodyweights.length === 0 ? (
-        <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Cargá tu peso para empezar a ver la evolución.</div></div>
+        <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>CargĂˇ tu peso para empezar a ver la evoluciĂłn.</div></div>
       ) : (
         <>
           {latest && (
@@ -530,7 +563,7 @@ function BodyweightTab({ bodyweights, bwInput, setBwInput, bwDate, setBwDate, ha
               )}
             </div>
           )}
-          <BarChartCard data={chartData} unit="KG" label="EVOLUCIÓN DE PESO CORPORAL" />
+          <BarChartCard data={chartData} unit="KG" label="EVOLUCIĂ“N DE PESO CORPORAL" />
         </>
       )}
     </div>
@@ -565,26 +598,26 @@ function GuideView() {
   return (
     <div style={styles.section}>
       <GuideCard title="CALENTAMIENTO" subtitle="Antes de la primera serie pesada de cada ejercicio">
-        <GuideItem>2-3 series crecientes con peso liviano/moderado antes de tu serie de trabajo (ej: 40% → 60% → 80% del peso pesado, 5-8 reps cada una).</GuideItem>
-        <GuideItem>No hace falta cargarlas en el registro — no aportan a la progresión, solo preparan articulaciones y sistema nervioso.</GuideItem>
+        <GuideItem>2-3 series crecientes con peso liviano/moderado antes de tu serie de trabajo (ej: 40% â†’ 60% â†’ 80% del peso pesado, 5-8 reps cada una).</GuideItem>
+        <GuideItem>No hace falta cargarlas en el registro â€” no aportan a la progresiĂłn, solo preparan articulaciones y sistema nervioso.</GuideItem>
         <GuideItem>5-10 min de movilidad articular general antes de empezar, especialmente si vas a hacer sentadilla o peso muerto.</GuideItem>
       </GuideCard>
       <GuideCard title="DESCANSO ENTRE SERIES" subtitle="Depende del ejercicio y la intensidad">
         <GuideItem><b>Compuestos pesados</b> (sentadilla, peso muerto, press banca): 2-3 min entre series de trabajo.</GuideItem>
-        <GuideItem><b>Accesorios</b> (curl, tríceps, zancadas): 60-90 seg alcanza.</GuideItem>
-        <GuideItem>Si te falta tiempo, hacé superseries con ejercicios que no compitan por el mismo grupo muscular.</GuideItem>
+        <GuideItem><b>Accesorios</b> (curl, trĂ­ceps, zancadas): 60-90 seg alcanza.</GuideItem>
+        <GuideItem>Si te falta tiempo, hacĂ© superseries con ejercicios que no compitan por el mismo grupo muscular.</GuideItem>
       </GuideCard>
-      <GuideCard title="CÓMO SUBIR EL PESO" subtitle="Sobrecarga progresiva">
-        <GuideItem>Cuando completás todas las series en el rango alto de reps, subís peso la próxima semana.</GuideItem>
-        <GuideItem>Subida típica: 2.5-5 kg en compuestos grandes, 1-2.5 kg en ejercicios de brazo/hombro.</GuideItem>
-        <GuideItem>Dejá 1-3 reps en reserva por serie — no llegues al fallo en cada una.</GuideItem>
-        <GuideItem>Si un peso te cuesta 2-3 sesiones seguidas, quedate ahí una semana más antes de forzar el aumento.</GuideItem>
+      <GuideCard title="CĂ“MO SUBIR EL PESO" subtitle="Sobrecarga progresiva">
+        <GuideItem>Cuando completĂˇs todas las series en el rango alto de reps, subĂ­s peso la prĂłxima semana.</GuideItem>
+        <GuideItem>Subida tĂ­pica: 2.5-5 kg en compuestos grandes, 1-2.5 kg en ejercicios de brazo/hombro.</GuideItem>
+        <GuideItem>DejĂˇ 1-3 reps en reserva por serie â€” no llegues al fallo en cada una.</GuideItem>
+        <GuideItem>Si un peso te cuesta 2-3 sesiones seguidas, quedate ahĂ­ una semana mĂˇs antes de forzar el aumento.</GuideItem>
       </GuideCard>
-      <GuideCard title="OTROS PUNTOS CLAVE" subtitle="Lo que más impacta en tu objetivo">
-        <GuideItem>Proteína: apuntá a 160-180g/día.</GuideItem>
-        <GuideItem>Déficit calórico leve (10-15%), no agresivo.</GuideItem>
-        <GuideItem>Sueño (7-9h) y reducir alcohol impactan más en grasa abdominal que cualquier suplemento.</GuideItem>
-        <GuideItem>La consistencia semanal pesa más que la rutina "perfecta".</GuideItem>
+      <GuideCard title="OTROS PUNTOS CLAVE" subtitle="Lo que mĂˇs impacta en tu objetivo">
+        <GuideItem>ProteĂ­na: apuntĂˇ a 160-180g/dĂ­a.</GuideItem>
+        <GuideItem>DĂ©ficit calĂłrico leve (10-15%), no agresivo.</GuideItem>
+        <GuideItem>SueĂ±o (7-9h) y reducir alcohol impactan mĂˇs en grasa abdominal que cualquier suplemento.</GuideItem>
+        <GuideItem>La consistencia semanal pesa mĂˇs que la rutina "perfecta".</GuideItem>
       </GuideCard>
     </div>
   );
@@ -600,7 +633,7 @@ function GuideCard({ title, subtitle, children }) {
   );
 }
 function GuideItem({ children }) {
-  return <div style={styles.guideItem}><span style={styles.guideBullet}>—</span><span style={styles.guideItemText}>{children}</span></div>;
+  return <div style={styles.guideItem}><span style={styles.guideBullet}>â€”</span><span style={styles.guideItemText}>{children}</span></div>;
 }
 
 const COLORS = {
