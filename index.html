@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-<title>Bitácora</title>
+<title>Bit&#xe1;cora</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -30,7 +30,7 @@
     }
   }
   window.addEventListener('error', function (e) {
-    showError((e.message || 'Error desconocido') + '\n\nArchivo: ' + (e.filename || '?') + '\nLínea: ' + (e.lineno || '?'));
+    showError((e.message || 'Error desconocido') + '\n\nArchivo: ' + (e.filename || '?') + '\nL&#xed;nea: ' + (e.lineno || '?'));
   });
   window.addEventListener('unhandledrejection', function (e) {
     showError('Promise rechazada: ' + (e.reason && e.reason.message ? e.reason.message : JSON.stringify(e.reason)));
@@ -52,7 +52,7 @@
     var root = document.getElementById('root');
     var box = document.getElementById('error-box');
     if (root && root.children.length === 0 && box.style.display !== 'block') {
-      showError('La app no cargó nada después de 6 segundos.\nEs probable que un recurso externo (React, Babel o Supabase) no se haya podido descargar — revisá la conexión o si algún bloqueador de anuncios está interfiriendo.');
+      showError('La app no carg&#xf3; nada despu&#xe9;s de 6 segundos.\nEs probable que un recurso externo (React, Babel o Supabase) no se haya podido descargar &#x2014; revis&#xe1; la conexi&#xf3;n o si alg&#xfa;n bloqueador de anuncios est&#xe1; interfiriendo.');
     }
   }, 6000);
 </script>
@@ -60,10 +60,6 @@
 <script type="text/babel" data-presets="react">
 const { useState, useEffect } = React;
 
-/* =========================================================
-   PASO OBLIGATORIO: pegá acá tus credenciales de Supabase.
-   Las conseguís en tu proyecto Supabase > Settings > API.
-   ========================================================= */
 const SUPABASE_URL = "https://mvhyzbhveathjsqkvhgl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aHl6Ymh2ZWF0aGpzcWt2aGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTc5NDYsImV4cCI6MjEwMjg5Mzk0Nn0.iANXf-9VNPHdYaJKR8PO8fCniUY7RCl3w-2O55ctjj4";
 
@@ -87,42 +83,87 @@ async function saveKey(key, value) {
   }
 }
 
-// ---- Routine definition ----
+function ytSearch(q) {
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+}
+
+// ---- Canonical exercise definitions (shared ids = shared progress tracking across days) ----
+const EX = {
+  sentadilla: { id: 'ex-sentadilla', name: 'Sentadilla', tip: 'Pecho arriba, rodillas en l\u00ednea con los pies, baj\u00e1 hasta que el muslo quede paralelo al piso.', video: ytSearch('sentadilla con barra t\u00e9cnica correcta') },
+  pressBanca: { id: 'ex-press-banca', name: 'Press banca', tip: 'Esc\u00e1pulas retra\u00eddas y hacia abajo, barra baja hasta rozar el pecho, no rebotar.', video: ytSearch('press banca t\u00e9cnica correcta') },
+  remoBarraManc: { id: 'ex-remo-barra', name: 'Remo con barra/mancuerna', tip: 'Espalda recta, tir\u00e1 con el codo (no con la mano), apret\u00e1 la espalda arriba.', video: ytSearch('remo con barra t\u00e9cnica correcta') },
+  pressMilitar: { id: 'ex-press-militar', name: 'Press militar', tip: 'Core apretado, no arquear demasiado la zona lumbar, barra sube en l\u00ednea recta.', video: ytSearch('press militar de pie t\u00e9cnica') },
+  curlBiceps: { id: 'ex-curl', name: 'Curl b\u00edceps', tip: 'Codos pegados al torso, sub\u00ed controlado, evit\u00e1 el impulso con la cadera.', video: ytSearch('curl de biceps con barra t\u00e9cnica') },
+  pesomuertoConv: { id: 'ex-pesomuerto-conv', name: 'Peso muerto convencional', tip: 'Espalda neutra siempre, la barra roza las piernas, empuj\u00e1 el piso con los talones.', video: ytSearch('peso muerto convencional t\u00e9cnica correcta') },
+  pesomuertoRum: { id: 'ex-pesomuerto-rumano', name: 'Peso muerto rumano', tip: 'Piernas casi rectas, empuj\u00e1 la cadera hacia atr\u00e1s, sent\u00eds el estiramiento en isquios.', video: ytSearch('peso muerto rumano t\u00e9cnica correcta') },
+  pressInclinado: { id: 'ex-press-inclinado', name: 'Press inclinado', tip: 'Banco a 30-45\u00b0, barra baja a la parte alta del pecho, controlado.', video: ytSearch('press inclinado con barra t\u00e9cnica') },
+  fondosAsistidos: { id: 'ex-fondos-asistidos', name: 'Fondos asistidos', tip: 'Torso ligeramente inclinado adelante para m\u00e1s pecho, baj\u00e1 hasta 90\u00b0 en el codo.', video: ytSearch('fondos en paralelas asistidos t\u00e9cnica') },
+  dominadasAsist: { id: 'ex-dominadas', name: 'Dominadas asistidas', tip: 'Esc\u00e1pulas abajo antes de tirar, ment\u00f3n sobre la barra, bajada controlada.', video: ytSearch('dominadas asistidas t\u00e9cnica correcta') },
+  jalonPecho: { id: 'ex-jalon', name: 'Jal\u00f3n al pecho', tip: 'Tir\u00e1 con la espalda, no con los brazos, llev\u00e1 la barra a la parte alta del pecho.', video: ytSearch('jal\u00f3n al pecho t\u00e9cnica correcta') },
+  zancadas: { id: 'ex-zancadas', name: 'Zancadas', tip: 'Paso largo, rodilla de atr\u00e1s casi toca el piso, torso derecho.', video: ytSearch('zancadas t\u00e9cnica correcta') },
+  prensaPiernas: { id: 'ex-prensa', name: 'Prensa de piernas', tip: 'Pies a la altura de los hombros, no bloquees las rodillas arriba del todo.', video: ytSearch('prensa de piernas t\u00e9cnica correcta') },
+  tricepsPolea: { id: 'ex-triceps-polea', name: 'Tr\u00edceps en polea', tip: 'Codos pegados al cuerpo, solo se mueve el antebrazo.', video: ytSearch('tr\u00edceps en polea t\u00e9cnica correcta') },
+  remoMaquina: { id: 'ex-remo-maquina', name: 'Remo en m\u00e1quina', tip: 'Pecho contra el respaldo, tir\u00e1 apretando la espalda, no los brazos.', video: ytSearch('remo en m\u00e1quina t\u00e9cnica correcta') },
+  remoTRX: { id: 'ex-remo-trx', name: 'Remo en TRX', tip: 'Cuerpo recto como una tabla, tir\u00e1 el pecho hacia las manos.', video: ytSearch('remo en TRX t\u00e9cnica correcta') },
+  pressMilitarManc: { id: 'ex-press-militar-manc', name: 'Press militar mancuernas', tip: 'Core apretado, mancuernas suben en l\u00ednea recta, no arquear la espalda.', video: ytSearch('press militar con mancuernas t\u00e9cnica') },
+  superCurlTriceps: { id: 'ex-super-curl-triceps', name: 'Superserie: curl + tr\u00edceps', tip: 'Sin descanso entre los dos ejercicios, descans\u00e1s reci\u00e9n al terminar ambos.', video: ytSearch('superserie curl biceps triceps') },
+};
+
+const CORE_EXERCISE = { id: 'core-opcional', name: 'Core (abdominales / plancha)', sets: 3, repRange: 'a elecci\u00f3n', tip: 'Eleg\u00ed 1-2 ejercicios (plancha, abdominales) y sosten\u00e9 buena forma antes que buscar m\u00e1s reps.', video: ytSearch('rutina b\u00e1sica de core plancha abdominales') };
+
+// ---- Routine: items are either fixed (single exercise) or a slot with variants to choose ----
 const ROUTINE = {
-  1: { label: 'Día 1', exercises: [
-    { id: 'd1-sentadilla', name: 'Sentadilla', sets: 4, repRange: '6-8' },
-    { id: 'd1-press-banca', name: 'Press banca', sets: 3, repRange: '6-8' },
-    { id: 'd1-remo', name: 'Remo con barra/mancuerna', sets: 3, repRange: '8-10' },
-    { id: 'd1-press-militar', name: 'Press militar', sets: 2, repRange: '8-10' },
-    { id: 'd1-curl', name: 'Curl bíceps', sets: 2, repRange: '10-12' },
+  1: { label: 'D\u00eda 1', exercises: [
+    { type: 'fixed', ex: EX.sentadilla, sets: 4, repRange: '6-8' },
+    { type: 'fixed', ex: EX.pressBanca, sets: 3, repRange: '6-8' },
+    { type: 'fixed', ex: EX.remoBarraManc, sets: 3, repRange: '8-10' },
+    { type: 'fixed', ex: EX.pressMilitar, sets: 2, repRange: '8-10' },
+    { type: 'fixed', ex: EX.curlBiceps, sets: 2, repRange: '10-12' },
   ]},
-  2: { label: 'Día 2', exercises: [
-    { id: 'd2-pesomuerto', name: 'Peso muerto (o rumano)', sets: 3, repRange: '6-8' },
-    { id: 'd2-press-inclinado', name: 'Press inclinado / fondos asistidos', sets: 3, repRange: '6-10' },
-    { id: 'd2-dominadas', name: 'Dominadas asistidas / jalón al pecho', sets: 3, repRange: '8-10' },
-    { id: 'd2-zancadas', name: 'Zancadas o prensa', sets: 2, repRange: '10-12' },
-    { id: 'd2-triceps', name: 'Tríceps en polea / fondos asistidos', sets: 2, repRange: '10-12' },
+  2: { label: 'D\u00eda 2', exercises: [
+    { type: 'slot', slotId: 'd2-pesomuerto', sets: 3, repRange: '6-8', options: [EX.pesomuertoConv, EX.pesomuertoRum] },
+    { type: 'slot', slotId: 'd2-empuje', sets: 3, repRange: '6-10', options: [EX.pressInclinado, EX.fondosAsistidos] },
+    { type: 'slot', slotId: 'd2-tiron', sets: 3, repRange: '8-10', options: [EX.dominadasAsist, EX.jalonPecho] },
+    { type: 'slot', slotId: 'd2-pierna', sets: 2, repRange: '10-12', options: [EX.zancadas, EX.prensaPiernas] },
+    { type: 'slot', slotId: 'd2-triceps', sets: 2, repRange: '10-12', options: [EX.tricepsPolea, EX.fondosAsistidos] },
   ]},
-  3: { label: 'Día 3', exercises: [
-    { id: 'd3-sentadilla-v', name: 'Sentadilla o prensa (variante)', sets: 3, repRange: '8-10' },
-    { id: 'd3-press-banca', name: 'Press banca o inclinado', sets: 3, repRange: '8-10' },
-    { id: 'd3-remo', name: 'Remo en máquina o TRX', sets: 3, repRange: '8-10' },
-    { id: 'd3-press-militar', name: 'Press militar mancuernas', sets: 2, repRange: '10-12' },
-    { id: 'd3-super', name: 'Superserie: curl + tríceps', sets: 2, repRange: '12' },
+  3: { label: 'D\u00eda 3', exercises: [
+    { type: 'slot', slotId: 'd3-pierna', sets: 3, repRange: '8-10', options: [EX.sentadilla, EX.prensaPiernas] },
+    { type: 'slot', slotId: 'd3-empuje', sets: 3, repRange: '8-10', options: [EX.pressBanca, EX.pressInclinado] },
+    { type: 'slot', slotId: 'd3-tiron', sets: 3, repRange: '8-10', options: [EX.remoMaquina, EX.remoTRX] },
+    { type: 'fixed', ex: EX.pressMilitarManc, sets: 2, repRange: '10-12' },
+    { type: 'fixed', ex: EX.superCurlTriceps, sets: 2, repRange: '12' },
   ]},
 };
-const CORE_EXERCISE = { id: 'core-opcional', name: 'Core (abdominales / plancha)', sets: 3, repRange: 'a elección' };
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
 const fmtDateShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 const daysBetween = (isoA, isoB) => Math.round((new Date(isoB + 'T00:00:00') - new Date(isoA + 'T00:00:00')) / 86400000);
 
-function emptyLogForDay(dayKey) {
-  const log = {};
-  [...ROUTINE[dayKey].exercises, CORE_EXERCISE].forEach((ex) => {
-    log[ex.id] = Array.from({ length: ex.sets }, () => ({ weight: '', reps: '' }));
+// Flat map of every exercise id -> full def (for names/tips/video lookups anywhere)
+const EXERCISE_BY_ID = {};
+Object.values(EX).forEach((e) => { EXERCISE_BY_ID[e.id] = e; });
+EXERCISE_BY_ID[CORE_EXERCISE.id] = CORE_EXERCISE;
+
+// Full flat list for the "progress" dropdown (unique by id)
+const ALL_EXERCISES_FLAT = Object.values(EX);
+
+function defaultSelectedVariants(dayKey) {
+  const map = {};
+  ROUTINE[dayKey].exercises.forEach((item) => {
+    if (item.type === 'slot') map[item.slotId] = item.options[0].id;
   });
+  return map;
+}
+
+function emptyLogForDay(dayKey, selectedVariants) {
+  const log = {};
+  ROUTINE[dayKey].exercises.forEach((item) => {
+    const exId = item.type === 'fixed' ? item.ex.id : (selectedVariants[item.slotId] || item.options[0].id);
+    log[exId] = Array.from({ length: item.sets }, () => ({ weight: '', reps: '' }));
+  });
+  log[CORE_EXERCISE.id] = Array.from({ length: CORE_EXERCISE.sets }, () => ({ weight: '', reps: '' }));
   return log;
 }
 
@@ -146,13 +187,14 @@ function GymTracker() {
   const [view, setView] = useState('log');
   const [selectedDay, setSelectedDay] = useState(1);
   const [date, setDate] = useState(todayISO());
-  const [entries, setEntries] = useState(emptyLogForDay(1));
+  const [selectedVariants, setSelectedVariants] = useState(defaultSelectedVariants(1));
+  const [entries, setEntries] = useState(emptyLogForDay(1, defaultSelectedVariants(1)));
   const [note, setNote] = useState('');
   const [saved, setSaved] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState(null);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [progressTab, setProgressTab] = useState('dashboard');
-  const [progressExerciseId, setProgressExerciseId] = useState('d1-sentadilla');
+  const [progressExerciseId, setProgressExerciseId] = useState(EX.sentadilla.id);
   const [bwInput, setBwInput] = useState('');
   const [bwDate, setBwDate] = useState(todayISO());
   const [configError, setConfigError] = useState(false);
@@ -171,13 +213,32 @@ function GymTracker() {
 
   useEffect(() => {
     if (editingSessionId) return;
-    setEntries(emptyLogForDay(selectedDay));
+    const defaults = defaultSelectedVariants(selectedDay);
+    setSelectedVariants(defaults);
+    setEntries(emptyLogForDay(selectedDay, defaults));
     setNote('');
     setSaved(false);
   }, [selectedDay]);
 
   const updateSet = (exId, setIdx, field, value) => {
-    setEntries((prev) => ({ ...prev, [exId]: prev[exId].map((s, i) => (i === setIdx ? { ...s, [field]: value } : s)) }));
+    setEntries((prev) => ({
+      ...prev,
+      [exId]: prev[exId].map((s, i) => (i === setIdx ? { ...s, [field]: value } : s)),
+    }));
+    setSaved(false);
+  };
+
+  const switchVariant = (slotId, newExId, sets) => {
+    setSelectedVariants((prev) => {
+      const oldExId = prev[slotId];
+      setEntries((prevEntries) => {
+        const next = { ...prevEntries };
+        if (oldExId && oldExId !== newExId) delete next[oldExId];
+        if (!next[newExId]) next[newExId] = Array.from({ length: sets }, () => ({ weight: '', reps: '' }));
+        return next;
+      });
+      return { ...prev, [slotId]: newExId };
+    });
     setSaved(false);
   };
 
@@ -211,9 +272,18 @@ function GymTracker() {
     setEditingSessionId(session.id);
     setDate(session.date);
     setSelectedDay(session.day);
-    const base = emptyLogForDay(session.day);
+    const defaults = defaultSelectedVariants(session.day);
+    // Infer which variant was used per slot by checking which option id exists in session.entries
+    ROUTINE[session.day].exercises.forEach((item) => {
+      if (item.type === 'slot') {
+        const found = item.options.find((o) => session.entries[o.id]);
+        if (found) defaults[item.slotId] = found.id;
+      }
+    });
+    setSelectedVariants(defaults);
+    const base = emptyLogForDay(session.day, defaults);
     Object.entries(session.entries).forEach(([exId, sets]) => {
-      if (base[exId]) base[exId] = sets.map((s) => ({ weight: s.weight ?? '', reps: s.reps ?? '' }));
+      base[exId] = sets.map((s) => ({ weight: s.weight ?? '', reps: s.reps ?? '' }));
     });
     setEntries(base);
     setNote(session.note || '');
@@ -225,12 +295,20 @@ function GymTracker() {
     const next = (sessions || []).filter((s) => s.id !== sessionId);
     setSessions(next);
     await saveKey('sessions', next);
-    if (editingSessionId === sessionId) { setEditingSessionId(null); setEntries(emptyLogForDay(selectedDay)); setNote(''); }
+    if (editingSessionId === sessionId) {
+      setEditingSessionId(null);
+      const defaults = defaultSelectedVariants(selectedDay);
+      setSelectedVariants(defaults);
+      setEntries(emptyLogForDay(selectedDay, defaults));
+      setNote('');
+    }
   };
 
   const handleCancelEdit = () => {
     setEditingSessionId(null);
-    setEntries(emptyLogForDay(selectedDay));
+    const defaults = defaultSelectedVariants(selectedDay);
+    setSelectedVariants(defaults);
+    setEntries(emptyLogForDay(selectedDay, defaults));
     setNote('');
     setSaved(false);
   };
@@ -245,9 +323,6 @@ function GymTracker() {
     setBwInput('');
   };
 
-  const allExercises = Object.values(ROUTINE).flatMap((d) => d.exercises);
-  const exerciseById = Object.fromEntries([...allExercises, CORE_EXERCISE].map((e) => [e.id, e]));
-
   const progressData = (sessions || [])
     .filter((s) => s.entries[progressExerciseId])
     .map((s) => ({ date: s.date, maxWeight: Math.max(0, ...s.entries[progressExerciseId].map((x) => parseFloat(x.weight) || 0)) }))
@@ -258,7 +333,7 @@ function GymTracker() {
     return (
       <div style={styles.loadingScreen}>
         <div style={{ ...styles.loadingText, maxWidth: 320, textAlign: 'center', lineHeight: 1.6 }}>
-          FALTA CONFIGURAR SUPABASE.<br/>Editá el archivo index.html y pegá tu URL y ANON KEY donde dice "PEGA_ACA".
+          FALTA CONFIGURAR SUPABASE.<br/>Edit\u00e1 el archivo index.html y peg\u00e1 tu URL y ANON KEY donde dice "PEGA_ACA".
         </div>
       </div>
     );
@@ -273,7 +348,7 @@ function GymTracker() {
       <header style={styles.header}>
         <div>
           <div style={styles.kicker}>REGISTRO DE ENTRENAMIENTO</div>
-          <h1 style={styles.title}>BITÁCORA</h1>
+          <h1 style={styles.title}>BIT\u00c1CORA</h1>
         </div>
         <div style={styles.headerRule} />
       </header>
@@ -282,20 +357,21 @@ function GymTracker() {
         <NavButton active={view === 'log'} onClick={() => setView('log')} label="Registrar" />
         <NavButton active={view === 'history'} onClick={() => setView('history')} label="Historial" />
         <NavButton active={view === 'progress'} onClick={() => setView('progress')} label="Progreso" />
-        <NavButton active={view === 'guide'} onClick={() => setView('guide')} label="Guía" />
+        <NavButton active={view === 'guide'} onClick={() => setView('guide')} label="Gu\u00eda" />
       </nav>
 
       {view === 'log' && (
         <LogView date={date} setDate={setDate} selectedDay={selectedDay} setSelectedDay={setSelectedDay}
           entries={entries} updateSet={updateSet} note={note} setNote={setNote} handleSave={handleSave}
-          saved={saved} sessions={sessions} editingSessionId={editingSessionId} handleCancelEdit={handleCancelEdit} />
+          saved={saved} sessions={sessions} editingSessionId={editingSessionId} handleCancelEdit={handleCancelEdit}
+          selectedVariants={selectedVariants} switchVariant={switchVariant} />
       )}
       {view === 'history' && (
-        <HistoryView sessions={sessions} exerciseById={exerciseById} expandedHistoryId={expandedHistoryId}
+        <HistoryView sessions={sessions} expandedHistoryId={expandedHistoryId}
           setExpandedHistoryId={setExpandedHistoryId} handleEditSession={handleEditSession} handleDeleteSession={handleDeleteSession} />
       )}
       {view === 'progress' && (
-        <ProgressView allExercises={allExercises} progressTab={progressTab} setProgressTab={setProgressTab}
+        <ProgressView progressTab={progressTab} setProgressTab={setProgressTab}
           progressExerciseId={progressExerciseId} setProgressExerciseId={setProgressExerciseId} progressData={progressData}
           sessions={sessions} bodyweights={bodyweights} bwInput={bwInput} setBwInput={setBwInput}
           bwDate={bwDate} setBwDate={setBwDate} handleSaveBodyweight={handleSaveBodyweight} />
@@ -309,13 +385,39 @@ function NavButton({ active, onClick, label }) {
   return <button onClick={onClick} style={{ ...styles.navButton, ...(active ? styles.navButtonActive : {}) }}>{label}</button>;
 }
 
-function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSet, note, setNote, handleSave, saved, sessions, editingSessionId, handleCancelEdit }) {
+function ExerciseInfoLinks({ ex }) {
+  return (
+    <div style={styles.exInfoRow}>
+      <a href={ex.video} target="_blank" rel="noopener noreferrer" style={styles.exVideoLink}>\u25b6 VER T\u00c9CNICA (VIDEO)</a>
+      {ex.tip && <div style={styles.exTip}>{ex.tip}</div>}
+    </div>
+  );
+}
+
+function SetInputs({ ex, sets, entries, updateSet }) {
+  return (
+    <div style={styles.setsGrid}>
+      <div style={styles.setsGridHeader}>
+        <span></span><span style={styles.setsGridHeaderCell}>KG</span><span style={styles.setsGridHeaderCell}>REPS</span>
+      </div>
+      {entries[ex.id]?.map((set, setIdx) => (
+        <div key={setIdx} style={styles.setRow}>
+          <span style={styles.setLabel}>Serie {setIdx + 1}</span>
+          <input type="number" inputMode="decimal" value={set.weight} onChange={(e) => updateSet(ex.id, setIdx, 'weight', e.target.value)} placeholder="\u2014" style={styles.setInput} />
+          <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(ex.id, setIdx, 'reps', e.target.value)} placeholder="\u2014" style={styles.setInput} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSet, note, setNote, handleSave, saved, sessions, editingSessionId, handleCancelEdit, selectedVariants, switchVariant }) {
   const day = ROUTINE[selectedDay];
   return (
     <div style={styles.section}>
       {editingSessionId && (
         <div style={styles.editBanner}>
-          <span>EDITANDO SESIÓN EXISTENTE</span>
+          <span>EDITANDO SESI\u00d3N EXISTENTE</span>
           <button onClick={handleCancelEdit} style={styles.editBannerCancel}>Cancelar</button>
         </div>
       )}
@@ -332,35 +434,59 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
       </div>
 
       <div style={styles.exerciseList}>
-        {day.exercises.map((ex, idx) => {
-          const last = lastPerformance(sessions, ex.id);
+        {day.exercises.map((item, idx) => {
+          if (item.type === 'fixed') {
+            const ex = item.ex;
+            const last = lastPerformance(sessions, ex.id);
+            return (
+              <div key={ex.id} style={styles.exerciseCard}>
+                <div style={styles.exerciseHeader}>
+                  <span style={styles.exerciseNum}>{String(idx + 1).padStart(2, '0')}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={styles.exerciseName}>{ex.name}</div>
+                    <div style={styles.exerciseMeta}>{item.sets} series \u00b7 {item.repRange} reps</div>
+                  </div>
+                </div>
+                <ExerciseInfoLinks ex={ex} />
+                {last && (
+                  <div style={styles.lastPerf}>
+                    <span style={styles.lastPerfLabel}>\u00daLTIMA VEZ</span>
+                    <span style={styles.lastPerfValue}>{last.weight}kg \u00d7 {last.reps} \u00b7 {fmtDateShort(last.date)}</span>
+                  </div>
+                )}
+                <SetInputs ex={ex} sets={item.sets} entries={entries} updateSet={updateSet} />
+              </div>
+            );
+          }
+          // slot type
+          const currentExId = selectedVariants[item.slotId];
+          const currentEx = item.options.find((o) => o.id === currentExId) || item.options[0];
+          const last = lastPerformance(sessions, currentEx.id);
           return (
-            <div key={ex.id} style={styles.exerciseCard}>
+            <div key={item.slotId} style={styles.exerciseCard}>
               <div style={styles.exerciseHeader}>
                 <span style={styles.exerciseNum}>{String(idx + 1).padStart(2, '0')}</span>
                 <div style={{ flex: 1 }}>
-                  <div style={styles.exerciseName}>{ex.name}</div>
-                  <div style={styles.exerciseMeta}>{ex.sets} series · {ex.repRange} reps</div>
+                  <div style={styles.exerciseName}>{currentEx.name}</div>
+                  <div style={styles.exerciseMeta}>{item.sets} series \u00b7 {item.repRange} reps</div>
                 </div>
               </div>
-              {last && (
-                <div style={styles.lastPerf}>
-                  <span style={styles.lastPerfLabel}>ÚLTIMA VEZ</span>
-                  <span style={styles.lastPerfValue}>{last.weight}kg × {last.reps} · {fmtDateShort(last.date)}</span>
-                </div>
-              )}
-              <div style={styles.setsGrid}>
-                <div style={styles.setsGridHeader}>
-                  <span></span><span style={styles.setsGridHeaderCell}>KG</span><span style={styles.setsGridHeaderCell}>REPS</span>
-                </div>
-                {entries[ex.id]?.map((set, setIdx) => (
-                  <div key={setIdx} style={styles.setRow}>
-                    <span style={styles.setLabel}>Serie {setIdx + 1}</span>
-                    <input type="number" inputMode="decimal" value={set.weight} onChange={(e) => updateSet(ex.id, setIdx, 'weight', e.target.value)} placeholder="—" style={styles.setInput} />
-                    <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(ex.id, setIdx, 'reps', e.target.value)} placeholder="—" style={styles.setInput} />
-                  </div>
+              <div style={styles.variantTabs}>
+                {item.options.map((opt) => (
+                  <button key={opt.id} onClick={() => switchVariant(item.slotId, opt.id, item.sets)}
+                    style={{ ...styles.variantTab, ...(opt.id === currentExId ? styles.variantTabActive : {}) }}>
+                    {opt.name}
+                  </button>
                 ))}
               </div>
+              <ExerciseInfoLinks ex={currentEx} />
+              {last && (
+                <div style={styles.lastPerf}>
+                  <span style={styles.lastPerfLabel}>\u00daLTIMA VEZ</span>
+                  <span style={styles.lastPerfValue}>{last.weight}kg \u00d7 {last.reps} \u00b7 {fmtDateShort(last.date)}</span>
+                </div>
+              )}
+              <SetInputs ex={currentEx} sets={item.sets} entries={entries} updateSet={updateSet} />
             </div>
           );
         })}
@@ -370,9 +496,10 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
             <span style={styles.exerciseNum}>+</span>
             <div style={{ flex: 1 }}>
               <div style={styles.exerciseName}>{CORE_EXERCISE.name}</div>
-              <div style={styles.exerciseMeta}>opcional · series x reps o segundos</div>
+              <div style={styles.exerciseMeta}>opcional \u00b7 series x reps o segundos</div>
             </div>
           </div>
+          <ExerciseInfoLinks ex={CORE_EXERCISE} />
           <div style={styles.setsGrid}>
             <div style={styles.setsGridHeader}>
               <span></span><span style={styles.setsGridHeaderCell}>EJERCICIO</span><span style={styles.setsGridHeaderCell}>REPS/SEG</span>
@@ -389,21 +516,21 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
       </div>
 
       <div style={styles.noteCard}>
-        <span style={styles.noteLabel}>NOTA DE LA SESIÓN (opcional)</span>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: me costó la última serie, subir peso próxima vez..." style={styles.noteInput} rows={2} />
+        <span style={styles.noteLabel}>NOTA DE LA SESI\u00d3N (opcional)</span>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: me cost\u00f3 la \u00faltima serie, subir peso pr\u00f3xima vez..." style={styles.noteInput} rows={2} />
       </div>
 
       <button onClick={handleSave} style={styles.saveButton}>
-        {saved ? `✓ ${editingSessionId ? 'CAMBIOS GUARDADOS' : 'GUARDADO'}` : (editingSessionId ? 'GUARDAR CAMBIOS' : 'GUARDAR SESIÓN')}
+        {saved ? `\u2713 ${editingSessionId ? 'CAMBIOS GUARDADOS' : 'GUARDADO'}` : (editingSessionId ? 'GUARDAR CAMBIOS' : 'GUARDAR SESI\u00d3N')}
       </button>
     </div>
   );
 }
 
-function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHistoryId, handleEditSession, handleDeleteSession }) {
+function HistoryView({ sessions, expandedHistoryId, setExpandedHistoryId, handleEditSession, handleDeleteSession }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   if (sessions.length === 0) {
-    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Registrá tu primera sesión para verla acá.</div></div>;
+    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Registr\u00e1 tu primera sesi\u00f3n para verla ac\u00e1.</div></div>;
   }
   return (
     <div style={styles.section}>
@@ -421,17 +548,17 @@ function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHis
                 </div>
                 <div style={styles.historyCardRight}>
                   <span style={styles.historyExCount}>{exCount} ejerc.</span>
-                  <span>{isOpen ? '▲' : '▼'}</span>
+                  <span>{isOpen ? '\u25b2' : '\u25bc'}</span>
                 </div>
               </button>
               {isOpen && (
                 <div style={styles.historyDetail}>
                   {Object.entries(s.entries).map(([exId, sets]) => (
                     <div key={exId} style={styles.historyExRow}>
-                      <div style={styles.historyExName}>{exerciseById[exId]?.name || exId}</div>
+                      <div style={styles.historyExName}>{EXERCISE_BY_ID[exId]?.name || exId}</div>
                       <div style={styles.historySets}>
                         {sets.filter((x) => x.weight !== '' || x.reps !== '').map((x, i) => (
-                          <span key={i} style={styles.historySetChip}>{x.weight || '—'}{exId === 'core-opcional' ? '' : 'kg'} × {x.reps || '—'}</span>
+                          <span key={i} style={styles.historySetChip}>{x.weight || '\u2014'}{exId === 'core-opcional' ? '' : 'kg'} \u00d7 {x.reps || '\u2014'}</span>
                         ))}
                       </div>
                     </div>
@@ -450,8 +577,8 @@ function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHis
                       </>
                     ) : (
                       <>
-                        <span style={styles.historyConfirmText}>¿Eliminar esta sesión?</span>
-                        <button style={styles.historyActionDelete} onClick={() => { handleDeleteSession(s.id); setConfirmDeleteId(null); }}>Sí, eliminar</button>
+                        <span style={styles.historyConfirmText}>\u00bfEliminar esta sesi\u00f3n?</span>
+                        <button style={styles.historyActionDelete} onClick={() => { handleDeleteSession(s.id); setConfirmDeleteId(null); }}>S\u00ed, eliminar</button>
                         <button style={styles.historyActionEdit} onClick={() => setConfirmDeleteId(null)}>Cancelar</button>
                       </>
                     )}
@@ -466,7 +593,7 @@ function HistoryView({ sessions, exerciseById, expandedHistoryId, setExpandedHis
   );
 }
 
-function ProgressView({ allExercises, progressTab, setProgressTab, progressExerciseId, setProgressExerciseId, progressData, sessions, bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight }) {
+function ProgressView({ progressTab, setProgressTab, progressExerciseId, setProgressExerciseId, progressData, sessions, bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight }) {
   return (
     <div style={styles.section}>
       <div style={styles.subTabs}>
@@ -480,12 +607,12 @@ function ProgressView({ allExercises, progressTab, setProgressTab, progressExerc
       {progressTab === 'exercise' && (
         <>
           <select value={progressExerciseId} onChange={(e) => setProgressExerciseId(e.target.value)} style={styles.exerciseSelect}>
-            {allExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+            {ALL_EXERCISES_FLAT.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
           </select>
           {progressData.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registrá este ejercicio para ver tu progreso acá.</div></div>
+            <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registr\u00e1 este ejercicio para ver tu progreso ac\u00e1.</div></div>
           ) : (
-            <BarChartCard data={progressData.map((p) => ({ date: p.date, value: p.maxWeight }))} unit="KG" label="PESO MÁXIMO POR SESIÓN" />
+            <BarChartCard data={progressData.map((p) => ({ date: p.date, value: p.maxWeight }))} unit="KG" label="PESO M\u00c1XIMO POR SESI\u00d3N" />
           )}
         </>
       )}
@@ -499,7 +626,7 @@ function ProgressView({ allExercises, progressTab, setProgressTab, progressExerc
 
 function DashboardTab({ sessions }) {
   if (sessions.length === 0) {
-    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registrá sesiones para ver tu resumen acá.</div></div>;
+    return <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registr\u00e1 sesiones para ver tu resumen ac\u00e1.</div></div>;
   }
   const totalSessions = sessions.length;
   const today = todayISO();
@@ -523,12 +650,12 @@ function DashboardTab({ sessions }) {
   return (
     <div style={styles.dashGrid}>
       <div style={styles.dashCard}><span style={styles.dashValue}>{totalSessions}</span><span style={styles.dashLabel}>SESIONES TOTALES</span></div>
-      <div style={styles.dashCard}><span style={styles.dashValue}>{last7}</span><span style={styles.dashLabel}>ÚLTIMOS 7 DÍAS</span></div>
+      <div style={styles.dashCard}><span style={styles.dashValue}>{last7}</span><span style={styles.dashLabel}>\u00daLTIMOS 7 D\u00cdAS</span></div>
       <div style={styles.dashCard}><span style={styles.dashValue}>{streakWeeks}</span><span style={styles.dashLabel}>SEMANAS SEGUIDAS</span></div>
       <div style={styles.dashCard}><span style={styles.dashValueSmall}>{totalSets}</span><span style={styles.dashLabel}>SERIES REGISTRADAS</span></div>
       <div style={{ ...styles.dashCard, gridColumn: '1 / -1' }}>
-        <span style={styles.dashLabel}>ÚLTIMA SESIÓN</span>
-        <span style={styles.dashValueSmall}>{ROUTINE[lastSession.day].label} · {fmtDate(lastSession.date)}{daysSinceLast > 0 && <span style={styles.dashSubtle}> ({daysSinceLast} día{daysSinceLast !== 1 ? 's' : ''} atrás)</span>}</span>
+        <span style={styles.dashLabel}>\u00daLTIMA SESI\u00d3N</span>
+        <span style={styles.dashValueSmall}>{ROUTINE[lastSession.day].label} \u00b7 {fmtDate(lastSession.date)}{daysSinceLast > 0 && <span style={styles.dashSubtle}> ({daysSinceLast} d\u00eda{daysSinceLast !== 1 ? 's' : ''} atr\u00e1s)</span>}</span>
       </div>
     </div>
   );
@@ -549,7 +676,7 @@ function BodyweightTab({ bodyweights, bwInput, setBwInput, bwDate, setBwDate, ha
         <button onClick={handleSaveBodyweight} style={styles.bwSaveButton}>REGISTRAR PESO</button>
       </div>
       {bodyweights.length === 0 ? (
-        <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Cargá tu peso para empezar a ver la evolución.</div></div>
+        <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN REGISTROS</div><div style={styles.emptyText}>Carg\u00e1 tu peso para empezar a ver la evoluci\u00f3n.</div></div>
       ) : (
         <>
           {latest && (
@@ -563,7 +690,7 @@ function BodyweightTab({ bodyweights, bwInput, setBwInput, bwDate, setBwDate, ha
               )}
             </div>
           )}
-          <BarChartCard data={chartData} unit="KG" label="EVOLUCIÓN DE PESO CORPORAL" />
+          <BarChartCard data={chartData} unit="KG" label="EVOLUCI\u00d3N DE PESO CORPORAL" />
         </>
       )}
     </div>
@@ -598,26 +725,32 @@ function GuideView() {
   return (
     <div style={styles.section}>
       <GuideCard title="CALENTAMIENTO" subtitle="Antes de la primera serie pesada de cada ejercicio">
-        <GuideItem>2-3 series crecientes con peso liviano/moderado antes de tu serie de trabajo (ej: 40% → 60% → 80% del peso pesado, 5-8 reps cada una).</GuideItem>
-        <GuideItem>No hace falta cargarlas en el registro — no aportan a la progresión, solo preparan articulaciones y sistema nervioso.</GuideItem>
+        <GuideItem>2-3 series crecientes con peso liviano/moderado antes de tu serie de trabajo (ej: 40% \u2192 60% \u2192 80% del peso pesado, 5-8 reps cada una).</GuideItem>
+        <GuideItem>No hace falta cargarlas en el registro \u2014 no aportan a la progresi\u00f3n, solo preparan articulaciones y sistema nervioso.</GuideItem>
         <GuideItem>5-10 min de movilidad articular general antes de empezar, especialmente si vas a hacer sentadilla o peso muerto.</GuideItem>
+        <GuideItem>El calentamiento espec\u00edfico de cada movimiento son justamente esas series de rampa con menos peso \u2014 no hace falta nada m\u00e1s elaborado por ejercicio.</GuideItem>
       </GuideCard>
       <GuideCard title="DESCANSO ENTRE SERIES" subtitle="Depende del ejercicio y la intensidad">
         <GuideItem><b>Compuestos pesados</b> (sentadilla, peso muerto, press banca): 2-3 min entre series de trabajo.</GuideItem>
-        <GuideItem><b>Accesorios</b> (curl, tríceps, zancadas): 60-90 seg alcanza.</GuideItem>
-        <GuideItem>Si te falta tiempo, hacé superseries con ejercicios que no compitan por el mismo grupo muscular.</GuideItem>
+        <GuideItem><b>Accesorios</b> (curl, tr\u00edceps, zancadas): 60-90 seg alcanza.</GuideItem>
+        <GuideItem>Si te falta tiempo, hac\u00e9 superseries con ejercicios que no compitan por el mismo grupo muscular.</GuideItem>
       </GuideCard>
-      <GuideCard title="CÓMO SUBIR EL PESO" subtitle="Sobrecarga progresiva">
-        <GuideItem>Cuando completás todas las series en el rango alto de reps, subís peso la próxima semana.</GuideItem>
-        <GuideItem>Subida típica: 2.5-5 kg en compuestos grandes, 1-2.5 kg en ejercicios de brazo/hombro.</GuideItem>
-        <GuideItem>Dejá 1-3 reps en reserva por serie — no llegues al fallo en cada una.</GuideItem>
-        <GuideItem>Si un peso te cuesta 2-3 sesiones seguidas, quedate ahí una semana más antes de forzar el aumento.</GuideItem>
+      <GuideCard title="C\u00d3MO SUBIR EL PESO" subtitle="Sobrecarga progresiva">
+        <GuideItem>Cuando complet\u00e1s todas las series en el rango alto de reps, sub\u00eds peso la pr\u00f3xima semana.</GuideItem>
+        <GuideItem>Subida t\u00edpica: 2.5-5 kg en compuestos grandes, 1-2.5 kg en ejercicios de brazo/hombro.</GuideItem>
+        <GuideItem>Dej\u00e1 1-3 reps en reserva por serie \u2014 no llegues al fallo en cada una.</GuideItem>
+        <GuideItem>Si un peso te cuesta 2-3 sesiones seguidas, quedate ah\u00ed una semana m\u00e1s antes de forzar el aumento.</GuideItem>
       </GuideCard>
-      <GuideCard title="OTROS PUNTOS CLAVE" subtitle="Lo que más impacta en tu objetivo">
-        <GuideItem>Proteína: apuntá a 160-180g/día.</GuideItem>
-        <GuideItem>Déficit calórico leve (10-15%), no agresivo.</GuideItem>
-        <GuideItem>Sueño (7-9h) y reducir alcohol impactan más en grasa abdominal que cualquier suplemento.</GuideItem>
-        <GuideItem>La consistencia semanal pesa más que la rutina "perfecta".</GuideItem>
+      <GuideCard title="SOBRE LOS EJERCICIOS CON OPCIONES" subtitle="D\u00edas 2 y 3 tienen variantes elegibles">
+        <GuideItem>Pod\u00e9s elegir cu\u00e1l hacer cada d\u00eda tocando el nombre en el selector de arriba del ejercicio.</GuideItem>
+        <GuideItem>Cada variante lleva su propio historial y gr\u00e1fico de progreso por separado \u2014 no se mezclan entre s\u00ed.</GuideItem>
+        <GuideItem>Press banca, press inclinado, sentadilla y prensa de piernas comparten historial entre d\u00edas cuando son el mismo movimiento \u2014 as\u00ed ves su progreso completo sin importar qu\u00e9 d\u00eda lo hiciste.</GuideItem>
+      </GuideCard>
+      <GuideCard title="OTROS PUNTOS CLAVE" subtitle="Lo que m\u00e1s impacta en tu objetivo">
+        <GuideItem>Prote\u00edna: apunt\u00e1 a 160-180g/d\u00eda.</GuideItem>
+        <GuideItem>D\u00e9ficit cal\u00f3rico leve (10-15%), no agresivo.</GuideItem>
+        <GuideItem>Sue\u00f1o (7-9h) y reducir alcohol impactan m\u00e1s en grasa abdominal que cualquier suplemento.</GuideItem>
+        <GuideItem>La consistencia semanal pesa m\u00e1s que la rutina "perfecta".</GuideItem>
       </GuideCard>
     </div>
   );
@@ -633,7 +766,7 @@ function GuideCard({ title, subtitle, children }) {
   );
 }
 function GuideItem({ children }) {
-  return <div style={styles.guideItem}><span style={styles.guideBullet}>—</span><span style={styles.guideItemText}>{children}</span></div>;
+  return <div style={styles.guideItem}><span style={styles.guideBullet}>\u2014</span><span style={styles.guideItemText}>{children}</span></div>;
 }
 
 const COLORS = {
@@ -666,6 +799,12 @@ const styles = {
   exerciseNum: { fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.ember, fontWeight: 700 },
   exerciseName: { fontSize: 17, fontWeight: 600, color: COLORS.paper, lineHeight: 1.2 },
   exerciseMeta: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.paperFaint, marginTop: 3, letterSpacing: '0.03em' },
+  variantTabs: { display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
+  variantTab: { background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '6px 10px', cursor: 'pointer' },
+  variantTabActive: { background: COLORS.emberDim, borderColor: COLORS.ember, color: COLORS.paper, fontWeight: 700 },
+  exInfoRow: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 },
+  exVideoLink: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.ember, textDecoration: 'none', letterSpacing: '0.04em' },
+  exTip: { fontSize: 12.5, color: COLORS.paperFaint, lineHeight: 1.5, fontStyle: 'italic' },
   lastPerf: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, padding: '6px 10px', marginBottom: 12 },
   lastPerfLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '0.08em', color: COLORS.paperFaint },
   lastPerfValue: { fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.paperDim },
