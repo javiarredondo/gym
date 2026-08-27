@@ -87,6 +87,28 @@ function ytSearch(q) {
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
 }
 
+// GIF animation links from an open exercise dataset (© Gym visual, used here as an external link only, never embedded)
+const GIF_BASE = 'https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/';
+const EX_GIFS = {
+  'ex-sentadilla': GIF_BASE + 'videos/0043-qXTaZnJ.gif',
+  'ex-press-banca': GIF_BASE + 'videos/0025-EIeI8Vf.gif',
+  'ex-remo-barra': GIF_BASE + 'videos/0027-eZyBC3j.gif',
+  'ex-press-militar': GIF_BASE + 'videos/1456-wdRZISl.gif',
+  'ex-curl': GIF_BASE + 'videos/0031-25GPyDY.gif',
+  'ex-pesomuerto-conv': GIF_BASE + 'videos/0032-ila4NZS.gif',
+  'ex-pesomuerto-rumano': GIF_BASE + 'videos/0085-wQ2c4XD.gif',
+  'ex-press-inclinado': GIF_BASE + 'videos/0047-3TZduzM.gif',
+  'ex-fondos-asistidos': GIF_BASE + 'videos/0019-J60bN17.gif',
+  'ex-dominadas': GIF_BASE + 'videos/0017-kiJ4Z2K.gif',
+  'ex-jalon': GIF_BASE + 'videos/0198-RVwzP10.gif',
+  'ex-zancadas': GIF_BASE + 'videos/1460-IZVHb27.gif',
+  'ex-prensa': GIF_BASE + 'videos/0739-10Z2DXU.gif',
+  'ex-triceps-polea': GIF_BASE + 'videos/0241-gAwDzB3.gif',
+  'ex-remo-maquina': GIF_BASE + 'videos/0861-fUBheHs.gif',
+  'ex-remo-trx': GIF_BASE + 'videos/0499-bZGHsAZ.gif',
+  'ex-press-militar-manc': GIF_BASE + 'videos/0405-znQUdHY.gif',
+};
+
 // ---- Canonical exercise definitions (shared ids = shared progress tracking across days) ----
 const EX = {
   sentadilla: { id: 'ex-sentadilla', name: 'Sentadilla', tip: 'Pecho arriba, rodillas en línea con los pies, bajá hasta que el muslo quede paralelo al piso.', video: ytSearch('sentadilla con barra técnica correcta') },
@@ -383,10 +405,24 @@ function NavButton({ active, onClick, label }) {
 }
 
 function ExerciseInfoLinks({ ex }) {
+  const gif = EX_GIFS[ex.id];
+  const [showGif, setShowGif] = useState(false);
   return (
     <div style={styles.exInfoRow}>
-      <a href={ex.video} target="_blank" rel="noopener noreferrer" style={styles.exVideoLink}>▶ VER TÉCNICA (VIDEO)</a>
+      <div style={styles.exLinksRow}>
+        <a href={ex.video} target="_blank" rel="noopener noreferrer" style={styles.exVideoLink}>▶ VER TÉCNICA (VIDEO)</a>
+        {gif && (
+          <button onClick={() => setShowGif((v) => !v)} style={styles.exGifToggle}>
+            {showGif ? '▾ OCULTAR ANIMACIÓN' : '▸ VER ANIMACIÓN'}
+          </button>
+        )}
+      </div>
       {ex.tip && <div style={styles.exTip}>{ex.tip}</div>}
+      {gif && showGif && (
+        <div style={styles.exGifWrap}>
+          <img src={gif} alt={ex.name} loading="lazy" style={styles.exGifImg} />
+        </div>
+      )}
     </div>
   );
 }
@@ -799,6 +835,10 @@ const styles = {
   variantTab: { background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '6px 10px', cursor: 'pointer' },
   variantTabActive: { background: COLORS.emberDim, borderColor: COLORS.ember, color: COLORS.paper, fontWeight: 700 },
   exInfoRow: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 },
+  exLinksRow: { display: 'flex', gap: 14, flexWrap: 'wrap' },
+  exGifToggle: { background: 'none', border: 'none', padding: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.ember, cursor: 'pointer', letterSpacing: '0.04em' },
+  exGifWrap: { marginTop: 10, display: 'flex', justifyContent: 'center', background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, padding: 10 },
+  exGifImg: { width: 160, height: 160, imageRendering: 'auto' },
   exVideoLink: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.ember, textDecoration: 'none', letterSpacing: '0.04em' },
   exTip: { fontSize: 12.5, color: COLORS.paperFaint, lineHeight: 1.5, fontStyle: 'italic' },
   lastPerf: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: COLORS.bgCardAlt, border: `1px solid ${COLORS.iron}`, padding: '6px 10px', marginBottom: 12 },
@@ -879,4 +919,5 @@ root.render(<GymTracker />);
 </script>
 </body>
 </html>
+
 
