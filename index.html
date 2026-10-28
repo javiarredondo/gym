@@ -65,22 +65,40 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ---- Storage helpers (using Supabase table "kv_store": key text, value jsonb) ----
+// ---- Storage helpers (Supabase table "kv_store": key text, value jsonb) + local copy on this device ----
+const LS_PREFIX = 'bitacora_';
+function lsSet(k, v) { try { localStorage.setItem(LS_PREFIX + k, JSON.stringify(v)); } catch (e) {} }
+function lsGet(k) { try { const r = localStorage.getItem(LS_PREFIX + k); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('Tiempo de espera agotado (la base no respondió)')), ms))]);
+}
+// IMPORTANT: a failed load must NEVER look like "no data" (otherwise the next save would overwrite real data).
 async function loadKey(key, fallback) {
-  try {
-    const { data, error } = await supabaseClient.from('kv_store').select('value').eq('key', key).maybeSingle();
-    if (error || !data) return fallback;
-    return data.value;
-  } catch {
-    return fallback;
-  }
+  const { data, error } = await withTimeout(supabaseClient.from('kv_store').select('value').eq('key', key).maybeSingle(), 12000);
+  if (error) throw new Error(error.message || String(error));
+  return data ? data.value : fallback;
 }
 async function saveKey(key, value) {
+  lsSet(key, value);
   try {
-    await supabaseClient.from('kv_store').upsert({ key, value });
+    const { error } = await withTimeout(supabaseClient.from('kv_store').upsert({ key, value }), 12000);
+    if (error) throw new Error(error.message || String(error));
+    return true;
   } catch (e) {
     console.error('Error guardando', key, e);
+    return false;
   }
+}
+function mergeById(a, b) {
+  const seen = new Set(); const out = [];
+  [...(a || []), ...(b || [])].forEach((x) => { if (x && !seen.has(x.id)) { seen.add(x.id); out.push(x); } });
+  return out.sort((x, y) => (x.date < y.date ? 1 : -1));
+}
+function mergeByDate(a, b) {
+  const map = {};
+  [...(b || []), ...(a || [])].forEach((x) => { if (x && x.date) map[x.date] = x; });
+  return Object.values(map).sort((x, y) => (x.date < y.date ? -1 : 1));
 }
 
 function ytSearch(q) {
@@ -107,6 +125,25 @@ const EX_GIFS = {
   'ex-remo-maquina': GIF_BASE + 'videos/0861-fUBheHs.gif',
   'ex-remo-trx': GIF_BASE + 'videos/0499-bZGHsAZ.gif',
   'ex-press-militar-manc': GIF_BASE + 'videos/0405-znQUdHY.gif',
+  // Casa (sin gimnasio)
+  'ex-flexiones': GIF_BASE + 'videos/0662-I4hDWkc.gif',
+  'ex-flexiones-rodillas': GIF_BASE + 'videos/3211-ZOuKWir.gif',
+  'ex-zancadas-casa': GIF_BASE + 'videos/3470-kMzUs9Y.gif',
+  'ex-remo-inv': GIF_BASE + 'videos/0499-bZGHsAZ.gif',
+  'ex-remo-inv-rodillas': GIF_BASE + 'videos/2300-VPPtusI.gif',
+  'ex-puente': GIF_BASE + 'videos/3013-u0cNiij.gif',
+  'ex-puente-1pierna': GIF_BASE + 'videos/3645-rmEukuS.gif',
+  'ex-dead-bug': GIF_BASE + 'videos/0276-iny3m5y.gif',
+  'ex-fondos-suelo': GIF_BASE + 'videos/1399-9RT8oQW.gif',
+  // Espalda
+  'bk-pelvic': GIF_BASE + 'videos/3147-NKJ8o6x.gif',
+  'bk-puente': GIF_BASE + 'videos/3013-u0cNiij.gif',
+  'bk-deadbug': GIF_BASE + 'videos/0276-iny3m5y.gif',
+  'bk-curlup': GIF_BASE + 'videos/3016-g2oKspu.gif',
+  'bk-sidebridge': GIF_BASE + 'videos/0705-RKjH6Lt.gif',
+  'bk-twist': GIF_BASE + 'videos/3639-6sYyrRX.gif',
+  'bk-seated': GIF_BASE + 'videos/0690-QFmz6ch.gif',
+  'bk-hamstring': GIF_BASE + 'videos/1511-99rWm7w.gif',
 };
 
 // ---- Canonical exercise definitions (shared ids = shared progress tracking across days) ----
@@ -128,6 +165,16 @@ const EX = {
   remoMaquina: { id: 'ex-remo-maquina', name: 'Remo en máquina', tip: 'Pecho contra el respaldo, tirá apretando la espalda, no los brazos.', video: ytSearch('remo en máquina técnica correcta') },
   remoTRX: { id: 'ex-remo-trx', name: 'Remo en TRX', tip: 'Cuerpo recto como una tabla, tirá el pecho hacia las manos.', video: ytSearch('remo en TRX técnica correcta') },
   pressMilitarManc: { id: 'ex-press-militar-manc', name: 'Press militar mancuernas', tip: 'Core apretado, mancuernas suben en línea recta, no arquear la espalda.', video: ytSearch('press militar con mancuernas técnica') },
+  flexiones: { id: 'ex-flexiones', name: 'Flexiones', tip: 'Cuerpo en línea recta de cabeza a talones, codos a ~45° del torso, bajá hasta casi tocar el piso.', video: ytSearch('flexiones de pecho técnica correcta') },
+  flexionesRodillas: { id: 'ex-flexiones-rodillas', name: 'Flexiones en rodillas', tip: 'Misma técnica que la flexión normal pero apoyando las rodillas: línea recta de rodillas a cabeza.', video: ytSearch('flexiones con rodillas apoyadas técnica') },
+  sentadillaLibre: { id: 'ex-sentadilla-libre', name: 'Sentadilla libre', tip: 'Pies al ancho de hombros, pecho arriba, bajá controlado (3 seg) y subí empujando el piso.', video: ytSearch('sentadilla sin peso técnica correcta') },
+  zancadasCasa: { id: 'ex-zancadas-casa', name: 'Zancadas (sin peso)', tip: 'Paso largo, torso derecho, rodilla de atrás casi toca el piso; alterná piernas.', video: ytSearch('zancadas sin peso técnica correcta') },
+  remoInv: { id: 'ex-remo-inv', name: 'Remo invertido', tip: 'Bajo una mesa firme o barra baja: cuerpo recto, tirá el pecho hacia el borde apretando la espalda.', video: ytSearch('remo invertido bajo mesa en casa') },
+  remoInvRodillas: { id: 'ex-remo-inv-rodillas', name: 'Remo invertido (rodillas flexionadas)', tip: 'Versión más fácil: rodillas dobladas y pies apoyados; mismo recorrido.', video: ytSearch('remo invertido rodillas flexionadas') },
+  puente: { id: 'ex-puente', name: 'Puente de glúteos', tip: 'Subí la cadera apretando glúteos, sin arquear la zona lumbar; pausa de 1-2 seg arriba.', video: ytSearch('puente de glúteos técnica correcta') },
+  puente1Pierna: { id: 'ex-puente-1pierna', name: 'Puente a una pierna', tip: 'Igual que el puente pero con una pierna estirada; pelvis nivelada, sin rotar.', video: ytSearch('puente de glúteos a una pierna') },
+  deadBug: { id: 'ex-dead-bug', name: 'Dead bug', tip: 'Lumbar pegada al piso; bajá brazo y pierna opuestos lento, sin que la espalda se despegue.', video: ytSearch('dead bug ejercicio técnica') },
+  fondosSuelo: { id: 'ex-fondos-suelo', name: 'Fondos de tríceps (banco/silla)', tip: 'Manos en el borde de una silla firme, codos hacia atrás, bajá hasta ~90° sin hundir los hombros.', video: ytSearch('fondos de triceps en silla técnica') },
   superCurlTriceps: { id: 'ex-super-curl-triceps', name: 'Superserie: curl + tríceps', tip: 'Sin descanso entre los dos ejercicios, descansás recién al terminar ambos.', video: ytSearch('superserie curl biceps triceps') },
 };
 
@@ -156,12 +203,61 @@ const ROUTINE = {
     { type: 'fixed', ex: EX.pressMilitarManc, sets: 2, repRange: '10-12' },
     { type: 'fixed', ex: EX.superCurlTriceps, sets: 2, repRange: '12' },
   ]},
+  4: { label: 'Casa', exercises: [
+    { type: 'slot', slotId: 'd4-empuje', sets: 3, repRange: '8-15', options: [EX.flexiones, EX.flexionesRodillas] },
+    { type: 'slot', slotId: 'd4-pierna', sets: 3, repRange: '12-15', options: [EX.sentadillaLibre, EX.zancadasCasa] },
+    { type: 'slot', slotId: 'd4-tiron', sets: 3, repRange: '8-12', options: [EX.remoInv, EX.remoInvRodillas] },
+    { type: 'slot', slotId: 'd4-gluteo', sets: 3, repRange: '12-15', options: [EX.puente, EX.puente1Pierna] },
+    { type: 'fixed', ex: EX.deadBug, sets: 3, repRange: '8-10 por lado' },
+    { type: 'fixed', ex: EX.fondosSuelo, sets: 2, repRange: '10-15' },
+  ]},
 };
+
+// ---- Espalda: rutina de activación / movilidad (no se registra serie por serie) ----
+const BK = {
+  pelvic: { id: 'bk-pelvic', name: 'Inclinación pélvica', tip: 'Boca arriba, rodillas dobladas: aplastá suavemente la zona lumbar contra el piso y soltá. Movimiento chico y lento.', video: ytSearch('inclinación pélvica ejercicio espalda baja') },
+  gatoCamello: { id: 'bk-gato', name: 'Gato-camello', tip: 'En cuatro apoyos, redondeá y arqueá la espalda suavemente, sin forzar el final del recorrido.', video: ytSearch('gato camello ejercicio movilidad columna') },
+  puente: { id: 'bk-puente', name: 'Puente de glúteos', tip: 'Apretá glúteos arriba y mantené 2 seg; no arquees la lumbar al subir.', video: ytSearch('puente de glúteos técnica correcta') },
+  birdDog: { id: 'bk-birddog', name: 'Bird dog', tip: 'En cuatro apoyos, estirá brazo y pierna opuestos sin que la pelvis rote ni la lumbar se hunda. Mantené 5-10 seg.', video: ytSearch('bird dog ejercicio técnica espalda baja') },
+  deadBug: { id: 'bk-deadbug', name: 'Dead bug', tip: 'Lumbar pegada al piso mientras bajás brazo y pierna opuestos, lento y controlado.', video: ytSearch('dead bug ejercicio técnica') },
+  curlUp: { id: 'bk-curlup', name: 'Curl-up (versión McGill)', tip: 'Una pierna doblada y otra estirada, manos bajo la zona lumbar. Levantá solo cabeza y hombros unos centímetros sin flexionar la columna y aguantá ~8-10 seg.', video: ytSearch('McGill curl up técnica') },
+  sidePlank: { id: 'bk-sidebridge', name: 'Plancha lateral', tip: 'Apoyá antebrazo y rodillas (fácil) o pies (difícil); cuerpo en línea de hombro a rodilla/pie. Aguantá 8-10 seg.', video: ytSearch('plancha lateral técnica McGill') },
+  rodillasPecho: { id: 'bk-rodillas', name: 'Rodillas al pecho', tip: 'Boca arriba, abrazá una o ambas rodillas suavemente y respirá lento. Sin dolor agudo.', video: ytSearch('rodillas al pecho estiramiento espalda baja') },
+  twist: { id: 'bk-twist', name: 'Torsión tumbado', tip: 'Rodillas dobladas, bajalas suave hacia un lado manteniendo los hombros apoyados. Recorrido cómodo.', video: ytSearch('torsión lumbar tumbado estiramiento') },
+  nino: { id: 'bk-nino', name: 'Postura del niño', tip: 'Sentate sobre los talones y deslizá los brazos adelante; respirá hacia la espalda baja.', video: ytSearch('postura del niño balasana') },
+  seated: { id: 'bk-seated', name: 'Estiramiento lumbar sentado', tip: 'Sentado, inclinate suave hacia adelante con la espalda relajada. Sin rebotes.', video: ytSearch('estiramiento lumbar sentado') },
+  hamstring: { id: 'bk-hamstring', name: 'Estiramiento de isquiotibiales', tip: 'Pierna estirada apoyada, inclinate desde la cadera con la espalda larga; tensión suave, no dolor.', video: ytSearch('estiramiento isquiotibiales técnica') },
+  flexorCadera: { id: 'bk-flexor', name: 'Estiramiento de flexor de cadera', tip: 'En zancada baja con la rodilla de atrás apoyada, llevá la cadera suavemente adelante apretando el glúteo de atrás.', video: ytSearch('estiramiento flexor de cadera zancada') },
+};
+const BACK_SECTIONS = [
+  { id: 'pre', title: 'PRE-GYM (5 MIN)', subtitle: 'Antes de entrenar: activación suave, sin fatigarte', items: [
+    { ex: BK.pelvic, dose: '1 × 10 lentas' },
+    { ex: BK.gatoCamello, dose: '1 × 8-10' },
+    { ex: BK.puente, dose: '1 × 10 (pausa 2 seg arriba)' },
+    { ex: BK.birdDog, dose: '1 × 5 por lado (aguante 5 seg)' },
+    { ex: BK.deadBug, dose: '1 × 6 por lado' },
+  ]},
+  { id: 'daily', title: 'RUTINA DIARIA (8-10 MIN)', subtitle: 'Fortalecimiento de core y cadera, estilo "McGill big 3" + glúteos', items: [
+    { ex: BK.curlUp, dose: '3 series: 6 → 4 → 2 reps con aguante de 8-10 seg' },
+    { ex: BK.sidePlank, dose: '3 series: 6 → 4 → 2 reps con aguante de 8-10 seg, por lado' },
+    { ex: BK.birdDog, dose: '3 series: 6 → 4 → 2 reps con aguante de 8-10 seg, por lado' },
+    { ex: BK.puente, dose: '2 × 10-12' },
+  ]},
+  { id: 'stretch', title: 'MOVILIDAD / ESTIRAMIENTO (OPCIONAL)', subtitle: 'Post entrenamiento o a la noche, para aflojar', items: [
+    { ex: BK.rodillasPecho, dose: '2 × 20-30 seg' },
+    { ex: BK.twist, dose: '1 × 6 lentas por lado' },
+    { ex: BK.nino, dose: '2 × 30 seg' },
+    { ex: BK.hamstring, dose: '2 × 30 seg por lado' },
+    { ex: BK.flexorCadera, dose: '2 × 30 seg por lado' },
+  ]},
+];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
 const fmtDateShort = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 const daysBetween = (isoA, isoB) => Math.round((new Date(isoB + 'T00:00:00') - new Date(isoA + 'T00:00:00')) / 86400000);
+
+const fmtPerf = (last) => `${last.weight !== '' && last.weight != null ? last.weight + 'kg × ' : ''}${last.reps !== '' && last.reps != null ? last.reps + ' reps' : ''}`;
 
 const EXERCISE_BY_ID = {};
 Object.values(EX).forEach((e) => { EXERCISE_BY_ID[e.id] = e; });
@@ -193,7 +289,8 @@ function lastPerformance(sessions, exId) {
       const filled = s.entries[exId].filter((x) => x.weight !== '' || x.reps !== '');
       if (filled.length > 0) {
         const maxWeight = Math.max(...filled.map((x) => parseFloat(x.weight) || 0));
-        const best = filled.find((x) => parseFloat(x.weight) === maxWeight) || filled[0];
+        const best = maxWeight > 0 ? (filled.find((x) => parseFloat(x.weight) === maxWeight) || filled[0])
+          : filled.reduce((a, b) => ((parseFloat(b.reps) || 0) > (parseFloat(a.reps) || 0) ? b : a), filled[0]);
         return { date: s.date, weight: best.weight, reps: best.reps };
       }
     }
@@ -218,6 +315,11 @@ function GymTracker() {
   const [bwInput, setBwInput] = useState('');
   const [bwDate, setBwDate] = useState(todayISO());
   const [configError, setConfigError] = useState(false);
+  const [backdays, setBackdays] = useState([]);
+  const [loadError, setLoadError] = useState(null);
+  const [restoreOffer, setRestoreOffer] = useState(null);
+  const [saveWarn, setSaveWarn] = useState(false);
+  const [loadTick, setLoadTick] = useState(0);
 
   useEffect(() => {
     if (SUPABASE_URL.includes('PEGA_ACA') || SUPABASE_ANON_KEY.includes('PEGA_ACA')) {
@@ -225,11 +327,54 @@ function GymTracker() {
       return;
     }
     (async () => {
-      const [s, bw] = await Promise.all([loadKey('sessions', []), loadKey('bodyweights', [])]);
-      setSessions(s || []);
-      setBodyweights(bw || []);
+      setLoadError(null);
+      try {
+        const [s, bw, bd] = await Promise.all([loadKey('sessions', []), loadKey('bodyweights', []), loadKey('backdays', [])]);
+        const sess = s || []; const bws = bw || [];
+        const sl = lsGet('sessions') || []; const bl = lsGet('bodyweights') || [];
+        if (sess.length === 0 && bws.length === 0 && (sl.length > 0 || bl.length > 0)) {
+          if (!lsGet('rescue')) lsSet('rescue', { sessions: sl, bodyweights: bl });
+          setRestoreOffer(lsGet('rescue'));
+        } else if (sess.length > 0 || bws.length > 0) {
+          lsSet('sessions', sess); lsSet('bodyweights', bws);
+        }
+        lsSet('backdays', bd || []);
+        setSessions(sess); setBodyweights(bws); setBackdays(bd || []);
+      } catch (e) {
+        setLoadError(String((e && e.message) || e));
+      }
     })();
-  }, []);
+  }, [loadTick]);
+
+  const persist = async (key, value) => {
+    const ok = await saveKey(key, value);
+    setSaveWarn(!ok);
+    return ok;
+  };
+
+  const handleRestoreLocal = async () => {
+    if (!restoreOffer) return;
+    const s = mergeById(sessions, restoreOffer.sessions);
+    const b = mergeByDate(bodyweights, restoreOffer.bodyweights);
+    setSessions(s); setBodyweights(b);
+    await persist('sessions', s); await persist('bodyweights', b);
+    setRestoreOffer(null);
+  };
+
+  const handleImportBackup = async (data) => {
+    const s = mergeById(sessions, Array.isArray(data.sessions) ? data.sessions : []);
+    const b = mergeByDate(bodyweights, Array.isArray(data.bodyweights) ? data.bodyweights : []);
+    const bd = Array.from(new Set([...(backdays || []), ...(Array.isArray(data.backdays) ? data.backdays : [])])).sort();
+    setSessions(s); setBodyweights(b); setBackdays(bd);
+    await persist('sessions', s); await persist('bodyweights', b); await persist('backdays', bd);
+  };
+
+  const handleToggleBackToday = async () => {
+    const t = todayISO();
+    const next = backdays.includes(t) ? backdays.filter((d) => d !== t) : [...backdays, t].sort();
+    setBackdays(next);
+    await persist('backdays', next);
+  };
 
   useEffect(() => {
     if (editingSessionId) return;
@@ -284,8 +429,8 @@ function GymTracker() {
     }
     next = next.sort((a, b) => (a.date < b.date ? 1 : -1));
     setSessions(next);
-    await saveKey('sessions', next);
-    setSaved(true);
+    const ok = await persist('sessions', next);
+    setSaved(ok);
   };
 
   const handleEditSession = (session) => {
@@ -313,7 +458,7 @@ function GymTracker() {
   const handleDeleteSession = async (sessionId) => {
     const next = (sessions || []).filter((s) => s.id !== sessionId);
     setSessions(next);
-    await saveKey('sessions', next);
+    await persist('sessions', next);
     if (editingSessionId === sessionId) {
       setEditingSessionId(null);
       const defaults = defaultSelectedVariants(selectedDay);
@@ -338,21 +483,52 @@ function GymTracker() {
     const filtered = (bodyweights || []).filter((b) => b.date !== bwDate);
     const next = [...filtered, { date: bwDate, weight: val }].sort((a, b) => (a.date < b.date ? -1 : 1));
     setBodyweights(next);
-    await saveKey('bodyweights', next);
+    await persist('bodyweights', next);
     setBwInput('');
   };
 
-  const progressData = (sessions || [])
+  const progressRows = (sessions || [])
     .filter((s) => s.entries[progressExerciseId])
-    .map((s) => ({ date: s.date, maxWeight: Math.max(0, ...s.entries[progressExerciseId].map((x) => parseFloat(x.weight) || 0)) }))
-    .filter((p) => p.maxWeight > 0)
+    .map((s) => ({
+      date: s.date,
+      maxWeight: Math.max(0, ...s.entries[progressExerciseId].map((x) => parseFloat(x.weight) || 0)),
+      maxReps: Math.max(0, ...s.entries[progressExerciseId].map((x) => parseFloat(x.reps) || 0)),
+    }))
     .sort((a, b) => (a.date > b.date ? 1 : -1));
+  const useReps = progressRows.every((r) => r.maxWeight === 0);
+  const progressUnit = useReps ? 'REPS' : 'KG';
+  const progressData = progressRows
+    .map((r) => ({ date: r.date, value: useReps ? r.maxReps : r.maxWeight }))
+    .filter((p) => p.value > 0);
 
   if (configError) {
     return (
       <div style={styles.loadingScreen}>
         <div style={{ ...styles.loadingText, maxWidth: 320, textAlign: 'center', lineHeight: 1.6 }}>
           FALTA CONFIGURAR SUPABASE.<br/>Editá el archivo index.html y pegá tu URL y ANON KEY donde dice "PEGA_ACA".
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    const hasLocal = (lsGet('sessions') || []).length > 0 || (lsGet('bodyweights') || []).length > 0;
+    return (
+      <div style={styles.loadingScreen}>
+        <div style={{ maxWidth: 340, padding: 20, color: COLORS.paper, fontFamily: "'Oswald', sans-serif" }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.ember, marginBottom: 10 }}>NO SE PUDO CONECTAR A LA BASE</div>
+          <div style={{ fontSize: 14, lineHeight: 1.6, color: COLORS.paperDim }}>
+            Tus datos <b>no se borraron</b>: la app no guarda nada mientras no pueda leerlos (así no pisa lo que ya tenés).<br /><br />
+            Causa más probable: Supabase (plan gratis) <b>pausa el proyecto</b> tras ~7 días sin actividad. Entrá a supabase.com/dashboard, abrí el proyecto y tocá <b>Restore / Resume project</b>. Después reintentá acá.
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.paperFaint, marginTop: 12, wordBreak: 'break-word' }}>Detalle: {loadError}</div>
+          <button onClick={() => { setSessions(null); setBodyweights(null); setLoadTick((t) => t + 1); }} style={styles.saveButton}>REINTENTAR</button>
+          {hasLocal && (
+            <button onClick={() => downloadJSON({ app: 'bitacora', exportedAt: new Date().toISOString(), sessions: lsGet('sessions') || [], bodyweights: lsGet('bodyweights') || [], backdays: lsGet('backdays') || [] }, 'bitacora-copia-local.json')}
+              style={{ ...styles.saveButton, background: 'none', border: `1px solid ${COLORS.ironLight}`, color: COLORS.paper, marginTop: 10 }}>
+              DESCARGAR COPIA LOCAL DE ESTE DISPOSITIVO
+            </button>
+          )}
         </div>
       </div>
     );
@@ -372,10 +548,24 @@ function GymTracker() {
         <div style={styles.headerRule} />
       </header>
 
+      {saveWarn && (
+        <div style={styles.warnBanner}>⚠ No se pudo guardar en la nube (quedó una copia en este dispositivo). Revisá la conexión o si Supabase está pausado y volvé a guardar.</div>
+      )}
+      {restoreOffer && (
+        <div style={styles.warnBanner}>
+          La base está vacía pero este dispositivo tiene una copia con {(restoreOffer.sessions || []).length} sesiones.
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={handleRestoreLocal} style={styles.warnBtn}>RESTAURAR COPIA</button>
+            <button onClick={() => setRestoreOffer(null)} style={styles.warnBtn}>IGNORAR</button>
+          </div>
+        </div>
+      )}
+
       <nav style={styles.nav}>
         <NavButton active={view === 'log'} onClick={() => setView('log')} label="Registrar" />
         <NavButton active={view === 'history'} onClick={() => setView('history')} label="Historial" />
         <NavButton active={view === 'progress'} onClick={() => setView('progress')} label="Progreso" />
+        <NavButton active={view === 'back'} onClick={() => setView('back')} label="Espalda" />
         <NavButton active={view === 'guide'} onClick={() => setView('guide')} label="Guía" />
       </nav>
 
@@ -391,11 +581,12 @@ function GymTracker() {
       )}
       {view === 'progress' && (
         <ProgressView progressTab={progressTab} setProgressTab={setProgressTab}
-          progressExerciseId={progressExerciseId} setProgressExerciseId={setProgressExerciseId} progressData={progressData}
+          progressExerciseId={progressExerciseId} setProgressExerciseId={setProgressExerciseId} progressData={progressData} progressUnit={progressUnit}
           sessions={sessions} bodyweights={bodyweights} bwInput={bwInput} setBwInput={setBwInput}
           bwDate={bwDate} setBwDate={setBwDate} handleSaveBodyweight={handleSaveBodyweight} />
       )}
-      {view === 'guide' && <GuideView />}
+      {view === 'back' && <BackView backdays={backdays} onToggleToday={handleToggleBackToday} />}
+      {view === 'guide' && <GuideView sessions={sessions} bodyweights={bodyweights} backdays={backdays} onImport={handleImportBackup} />}
     </div>
   );
 }
@@ -456,7 +647,7 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
       )}
       <div style={styles.controlsRow}>
         <div style={styles.dayTabs}>
-          {[1, 2, 3].map((d) => (
+          {Object.keys(ROUTINE).map(Number).map((d) => (
             <button key={d} disabled={!!editingSessionId} onClick={() => setSelectedDay(d)}
               style={{ ...styles.dayTab, ...(selectedDay === d ? styles.dayTabActive : {}), ...(editingSessionId ? styles.dayTabDisabled : {}) }}>
               {ROUTINE[d].label}
@@ -466,6 +657,9 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
         <input type="date" value={date} disabled={!!editingSessionId} onChange={(e) => setDate(e.target.value)} style={styles.dateInput} />
       </div>
 
+      {selectedDay === 4 && (
+        <div style={{ ...styles.guideItemText, marginBottom: 14 }}>Rutina sin gimnasio. Dejá <b>KG</b> vacío si es peso corporal (podés poner kg si usás mochila o mancuernas) y cargá solo las <b>reps</b>.</div>
+      )}
       <div style={styles.exerciseList}>
         {day.exercises.map((item, idx) => {
           if (item.type === 'fixed') {
@@ -484,7 +678,7 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
                 {last && (
                   <div style={styles.lastPerf}>
                     <span style={styles.lastPerfLabel}>ÚLTIMA VEZ</span>
-                    <span style={styles.lastPerfValue}>{last.weight}kg × {last.reps} · {fmtDateShort(last.date)}</span>
+                    <span style={styles.lastPerfValue}>{fmtPerf(last)} · {fmtDateShort(last.date)}</span>
                   </div>
                 )}
                 <SetInputs ex={ex} sets={item.sets} entries={entries} updateSet={updateSet} />
@@ -515,7 +709,7 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
               {last && (
                 <div style={styles.lastPerf}>
                   <span style={styles.lastPerfLabel}>ÚLTIMA VEZ</span>
-                  <span style={styles.lastPerfValue}>{last.weight}kg × {last.reps} · {fmtDateShort(last.date)}</span>
+                  <span style={styles.lastPerfValue}>{fmtPerf(last)} · {fmtDateShort(last.date)}</span>
                 </div>
               )}
               <SetInputs ex={currentEx} sets={item.sets} entries={entries} updateSet={updateSet} />
@@ -590,7 +784,7 @@ function HistoryView({ sessions, expandedHistoryId, setExpandedHistoryId, handle
                       <div style={styles.historyExName}>{EXERCISE_BY_ID[exId]?.name || exId}</div>
                       <div style={styles.historySets}>
                         {sets.filter((x) => x.weight !== '' || x.reps !== '').map((x, i) => (
-                          <span key={i} style={styles.historySetChip}>{x.weight || '—'}{exId === 'core-opcional' ? '' : 'kg'} × {x.reps || '—'}</span>
+                          <span key={i} style={styles.historySetChip}>{x.weight ? x.weight + (exId === 'core-opcional' ? '' : 'kg') + ' × ' : ''}{x.reps || '—'}</span>
                         ))}
                       </div>
                     </div>
@@ -625,7 +819,7 @@ function HistoryView({ sessions, expandedHistoryId, setExpandedHistoryId, handle
   );
 }
 
-function ProgressView({ progressTab, setProgressTab, progressExerciseId, setProgressExerciseId, progressData, sessions, bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight }) {
+function ProgressView({ progressTab, setProgressTab, progressExerciseId, setProgressExerciseId, progressData, progressUnit, sessions, bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight }) {
   return (
     <div style={styles.section}>
       <div style={styles.subTabs}>
@@ -644,7 +838,7 @@ function ProgressView({ progressTab, setProgressTab, progressExerciseId, setProg
           {progressData.length === 0 ? (
             <div style={styles.emptyState}><div style={styles.emptyTitle}>SIN DATOS</div><div style={styles.emptyText}>Registrá este ejercicio para ver tu progreso acá.</div></div>
           ) : (
-            <BarChartCard data={progressData.map((p) => ({ date: p.date, value: p.maxWeight }))} unit="KG" label="PESO MÁXIMO POR SESIÓN" />
+            <BarChartCard data={progressData} unit={progressUnit} label={progressUnit === 'REPS' ? 'REPS MÁXIMAS POR SESIÓN' : 'PESO MÁXIMO POR SESIÓN'} />
           )}
         </>
       )}
@@ -753,9 +947,104 @@ function BarChartCard({ data, unit, label }) {
   );
 }
 
-function GuideView() {
+function downloadJSON(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function BackupCard({ sessions, bodyweights, backdays, onImport }) {
+  const [msg, setMsg] = useState('');
+  const doExport = () => {
+    downloadJSON({ app: 'bitacora', version: 1, exportedAt: new Date().toISOString(), sessions, bodyweights, backdays }, `bitacora-backup-${todayISO()}.json`);
+    setMsg('Copia descargada. Guardala en Drive/iCloud o mandatela por mail.');
+  };
+  const doImport = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || (!Array.isArray(data.sessions) && !Array.isArray(data.bodyweights))) throw new Error('formato');
+        await onImport(data);
+        setMsg('Copia importada y combinada con tus datos actuales (sin duplicar).');
+      } catch (err) { setMsg('El archivo no parece una copia válida de Bitácora.'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+  return (
+    <GuideCard title="COPIA DE SEGURIDAD" subtitle="Tus datos son tuyos: descargalos cada tanto">
+      <GuideItem>Descargá una copia cada 2-4 semanas. Si algún día la base se pierde, la importás y listo.</GuideItem>
+      <GuideItem>Sesiones: {sessions.length} · Registros de peso: {bodyweights.length}</GuideItem>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={doExport} style={styles.warnBtn}>DESCARGAR COPIA</button>
+        <label style={{ ...styles.warnBtn, display: 'inline-block' }}>IMPORTAR COPIA<input type="file" accept="application/json,.json" onChange={doImport} style={{ display: 'none' }} /></label>
+      </div>
+      {msg && <div style={styles.guideItemText}>{msg}</div>}
+    </GuideCard>
+  );
+}
+
+function BackView({ backdays, onToggleToday }) {
+  const today = todayISO();
+  const doneToday = backdays.includes(today);
+  const last7 = backdays.filter((d) => { const n = daysBetween(d, today); return n >= 0 && n < 7; }).length;
   return (
     <div style={styles.section}>
+      <div style={styles.guideCard}>
+        <div style={styles.guideCardTitle}>ESPALDA BAJA</div>
+        <div style={{ ...styles.guideCardSubtitle, marginBottom: 12 }}>Últimos 7 días: {last7}/7 días hechos</div>
+        <button onClick={onToggleToday} style={{ ...styles.saveButton, marginTop: 0, ...(doneToday ? { background: COLORS.emberDim, color: COLORS.paper } : {}) }}>
+          {doneToday ? '✓ HECHO HOY (tocá para deshacer)' : 'MARCAR RUTINA DE HOY COMO HECHA'}
+        </button>
+      </div>
+      {BACK_SECTIONS.map((sec) => (
+        <div key={sec.id} style={styles.guideCard}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={styles.guideCardTitle}>{sec.title}</div>
+            <div style={styles.guideCardSubtitle}>{sec.subtitle}</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {sec.items.map((it, i) => (
+              <div key={i}>
+                <div style={styles.exerciseName}>{it.ex.name}</div>
+                <div style={styles.exerciseMeta}>{it.dose}</div>
+                <ExerciseInfoLinks ex={it.ex} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <GuideCard title="QUÉ DICE LA EVIDENCIA" subtitle="Resumen honesto, no es consejo médico">
+        <GuideItem>Las guías (OMS 2023, NICE) recomiendan <b>ejercicio y mantenerse activo</b> como primer paso en dolor lumbar; el ejercicio probablemente reduce el dolor frente a no hacer nada.</GuideItem>
+        <GuideItem>No hay un ejercicio claramente superior a otros: fortalecimiento de core/cadera, control motor, aeróbico y yoga dan resultados parecidos. Lo que mejor funciona es <b>lo que hacés seguido</b>.</GuideItem>
+        <GuideItem>El estiramiento aislado tiene evidencia más débil: sirve para aflojar y moverte mejor, no como único tratamiento.</GuideItem>
+        <GuideItem>Un dolor leve (hasta ~3-4/10) que se calma al terminar es aceptable. Si el ejercicio lo aumenta o lo irradia, pará ese ejercicio.</GuideItem>
+        <GuideItem>Si el dolor aparece en sentadilla o peso muerto, bajá la carga y revisá técnica (idealmente con un kinesiólogo/fisio).</GuideItem>
+      </GuideCard>
+      <GuideCard title="SEÑALES DE ALARMA" subtitle="Consultá a un médico sin esperar">
+        <GuideItem>Dolor que baja por debajo de la rodilla, hormigueo, entumecimiento o debilidad en una pierna.</GuideItem>
+        <GuideItem>Cambios al orinar o al defecar, o entumecimiento en la zona genital/entrepierna.</GuideItem>
+        <GuideItem>Fiebre, golpe o caída reciente, o dolor intenso que no cede de noche en reposo.</GuideItem>
+        <GuideItem>Dolor que no mejora o empeora después de 4-6 semanas.</GuideItem>
+      </GuideCard>
+    </div>
+  );
+}
+
+function GuideView({ sessions, bodyweights, backdays, onImport }) {
+  return (
+    <div style={styles.section}>
+      <GuideCard title="VOLVER DESPUÉS DE UN PARÓN" subtitle="Si pasaron semanas o meses sin entrenar">
+        <GuideItem>Primeras 2 semanas: ~60-70% de los pesos de antes, 2 series por ejercicio, dejando 3+ reps en reserva.</GuideItem>
+        <GuideItem>Semanas 3-4: pasá a las series completas y volvé a subir peso de a poco.</GuideItem>
+        <GuideItem>Sin gimnasio, el día <b>Casa</b> mantiene el hábito. Mejor 2 sesiones cortas por semana que ninguna.</GuideItem>
+        <GuideItem>Hacé la activación de la pestaña Espalda antes de entrenar, especialmente en los primeros días.</GuideItem>
+      </GuideCard>
       <GuideCard title="CALENTAMIENTO" subtitle="Antes de la primera serie pesada de cada ejercicio">
         <GuideItem>2-3 series crecientes con peso liviano/moderado antes de tu serie de trabajo (ej: 40% → 60% → 80% del peso pesado, 5-8 reps cada una).</GuideItem>
         <GuideItem>No hace falta cargarlas en el registro — no aportan a la progresión, solo preparan articulaciones y sistema nervioso.</GuideItem>
@@ -773,7 +1062,7 @@ function GuideView() {
         <GuideItem>Dejá 1-3 reps en reserva por serie — no llegues al fallo en cada una.</GuideItem>
         <GuideItem>Si un peso te cuesta 2-3 sesiones seguidas, quedate ahí una semana más antes de forzar el aumento.</GuideItem>
       </GuideCard>
-      <GuideCard title="SOBRE LOS EJERCICIOS CON OPCIONES" subtitle="Días 2 y 3 tienen variantes elegibles">
+      <GuideCard title="SOBRE LOS EJERCICIOS CON OPCIONES" subtitle="Días 2, 3 y Casa tienen variantes elegibles">
         <GuideItem>Podés elegir cuál hacer cada día tocando el nombre en el selector de arriba del ejercicio.</GuideItem>
         <GuideItem>Cada variante lleva su propio historial y gráfico de progreso por separado — no se mezclan entre sí.</GuideItem>
         <GuideItem>Press banca, press inclinado, sentadilla y prensa de piernas comparten historial entre días cuando son el mismo movimiento — así ves su progreso completo sin importar qué día lo hiciste.</GuideItem>
@@ -784,6 +1073,7 @@ function GuideView() {
         <GuideItem>Sueño (7-9h) y reducir alcohol impactan más en grasa abdominal que cualquier suplemento.</GuideItem>
         <GuideItem>La consistencia semanal pesa más que la rutina "perfecta".</GuideItem>
       </GuideCard>
+      <BackupCard sessions={sessions} bodyweights={bodyweights} backdays={backdays} onImport={onImport} />
     </div>
   );
 }
@@ -814,8 +1104,8 @@ const styles = {
   kicker: { fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.15em', color: COLORS.ember, marginBottom: 6 },
   title: { fontSize: 34, fontWeight: 700, letterSpacing: '0.02em', margin: 0, color: COLORS.paper },
   headerRule: { height: 3, background: `linear-gradient(90deg, ${COLORS.ember} 0%, ${COLORS.iron} 40%)`, marginTop: 18 },
-  nav: { display: 'flex', gap: 0, padding: '0 20px', marginTop: 20, borderBottom: `1px solid ${COLORS.iron}` },
-  navButton: { background: 'none', border: 'none', color: COLORS.paperDim, fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '10px 14px 12px', cursor: 'pointer', borderBottom: '3px solid transparent', marginBottom: -1 },
+  nav: { display: 'flex', gap: 0, padding: '0 12px', overflowX: 'auto', marginTop: 20, borderBottom: `1px solid ${COLORS.iron}` },
+  navButton: { background: 'none', border: 'none', color: COLORS.paperDim, fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', padding: '10px 9px 12px', whiteSpace: 'nowrap', cursor: 'pointer', borderBottom: '3px solid transparent', marginBottom: -1 },
   navButtonActive: { color: COLORS.paper, borderBottom: `3px solid ${COLORS.ember}` },
   section: { padding: '20px 20px 0' },
   controlsRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' },
@@ -879,6 +1169,8 @@ const styles = {
   historyConfirmText: { fontSize: 12, color: COLORS.paperDim, marginRight: 4 },
   subTabs: { display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' },
   subTab: { display: 'flex', alignItems: 'center', gap: 6, background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '8px 12px', cursor: 'pointer', letterSpacing: '0.03em' },
+  warnBanner: { margin: '14px 20px 0', background: COLORS.emberDim, color: COLORS.paper, padding: '10px 14px', fontSize: 13, lineHeight: 1.5 },
+  warnBtn: { background: 'none', border: `1px solid ${COLORS.paper}`, color: COLORS.paper, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '6px 10px', cursor: 'pointer' },
   subTabActive: { background: COLORS.ember, borderColor: COLORS.ember, color: '#1a1410', fontWeight: 700 },
   exerciseSelect: { width: '100%', background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, color: COLORS.paper, fontFamily: "'Oswald', sans-serif", fontSize: 15, padding: '12px 10px', marginBottom: 20, boxSizing: 'border-box' },
   dashGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
