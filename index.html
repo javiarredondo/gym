@@ -16,7 +16,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
- 
+
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #141310; }
@@ -133,6 +133,9 @@ const EX_GIFS = {
   'ex-remo-maquina': GIF_BASE + 'videos/0861-fUBheHs.gif',
   'ex-remo-trx': GIF_BASE + 'videos/0499-bZGHsAZ.gif',
   'ex-press-militar-manc': GIF_BASE + 'videos/0405-znQUdHY.gif',
+  'ex-elev-lateral': GIF_BASE + 'videos/0334-DsgkuIt.gif',
+  'ex-curl-femoral': GIF_BASE + 'videos/0599-Zg3XY7P.gif',
+  'ex-triceps-sobre-cabeza': GIF_BASE + 'videos/0194-2IxROQ1.gif',
   // Casa (sin gimnasio)
   'ex-flexiones': GIF_BASE + 'videos/0662-I4hDWkc.gif',
   'ex-flexiones-rodillas': GIF_BASE + 'videos/3211-ZOuKWir.gif',
@@ -173,6 +176,9 @@ const EX = {
   remoMaquina: { id: 'ex-remo-maquina', name: 'Remo en máquina', tip: 'Pecho contra el respaldo, tirá apretando la espalda, no los brazos.', video: ytSearch('remo en máquina técnica correcta') },
   remoTRX: { id: 'ex-remo-trx', name: 'Remo en TRX', tip: 'Cuerpo recto como una tabla, tirá el pecho hacia las manos.', video: ytSearch('remo en TRX técnica correcta') },
   pressMilitarManc: { id: 'ex-press-militar-manc', name: 'Press militar mancuernas', tip: 'Core apretado, mancuernas suben en línea recta, no arquear la espalda.', video: ytSearch('press militar con mancuernas técnica') },
+  elevLateral: { id: 'ex-elev-lateral', name: 'Elevaciones laterales', tip: 'Mancuernas livianas, codos apenas flexionados, subí hasta la altura del hombro sin balancear el torso.', video: ytSearch('elevaciones laterales mancuernas técnica') },
+  curlFemoral: { id: 'ex-curl-femoral', name: 'Curl femoral (máquina)', tip: 'Cadera pegada al asiento, flexioná llevando los talones hacia los glúteos, bajada lenta (2-3 seg).', video: ytSearch('curl femoral en máquina técnica') },
+  tricepsSobreCabeza: { id: 'ex-triceps-sobre-cabeza', name: 'Tríceps sobre la cabeza', tip: 'Codos apuntando arriba y cerca de la cabeza, solo se mueve el antebrazo; en polea con cuerda o con una mancuerna.', video: ytSearch('extensión de tríceps sobre la cabeza polea técnica') },
   flexiones: { id: 'ex-flexiones', name: 'Flexiones', tip: 'Cuerpo en línea recta de cabeza a talones, codos a ~45° del torso, bajá hasta casi tocar el piso.', video: ytSearch('flexiones de pecho técnica correcta') },
   flexionesRodillas: { id: 'ex-flexiones-rodillas', name: 'Flexiones en rodillas', tip: 'Misma técnica que la flexión normal pero apoyando las rodillas: línea recta de rodillas a cabeza.', video: ytSearch('flexiones con rodillas apoyadas técnica') },
   sentadillaLibre: { id: 'ex-sentadilla-libre', name: 'Sentadilla libre', tip: 'Pies al ancho de hombros, pecho arriba, bajá controlado (3 seg) y subí empujando el piso.', video: ytSearch('sentadilla sin peso técnica correcta') },
@@ -183,7 +189,7 @@ const EX = {
   puente1Pierna: { id: 'ex-puente-1pierna', name: 'Puente a una pierna', tip: 'Igual que el puente pero con una pierna estirada; pelvis nivelada, sin rotar.', video: ytSearch('puente de glúteos a una pierna') },
   deadBug: { id: 'ex-dead-bug', name: 'Dead bug', tip: 'Lumbar pegada al piso; bajá brazo y pierna opuestos lento, sin que la espalda se despegue.', video: ytSearch('dead bug ejercicio técnica') },
   fondosSuelo: { id: 'ex-fondos-suelo', name: 'Fondos de tríceps (banco/silla)', tip: 'Manos en el borde de una silla firme, codos hacia atrás, bajá hasta ~90° sin hundir los hombros.', video: ytSearch('fondos de triceps en silla técnica') },
-  superCurlTriceps: { id: 'ex-super-curl-triceps', name: 'Superserie: curl + tríceps', tip: 'Sin descanso entre los dos ejercicios, descansás recién al terminar ambos.', video: ytSearch('superserie curl biceps triceps') },
+  superCurlTriceps: { id: 'ex-super-curl-triceps', name: 'Superserie: curl + tríceps (histórico)', tip: 'Sin descanso entre los dos ejercicios, descansás recién al terminar ambos.', video: ytSearch('superserie curl biceps triceps') },
 };
 
 const CORE_EXERCISE = { id: 'core-opcional', name: 'Core (abdominales / plancha)', sets: 3, repRange: 'a elección', tip: 'Elegí 1-2 ejercicios (plancha, abdominales) y sostené buena forma antes que buscar más reps.', video: ytSearch('rutina básica de core plancha abdominales') };
@@ -202,14 +208,17 @@ const ROUTINE = {
     { type: 'slot', slotId: 'd2-empuje', sets: 3, repRange: '6-10', options: [EX.pressInclinado, EX.fondosAsistidos] },
     { type: 'slot', slotId: 'd2-tiron', sets: 3, repRange: '8-10', options: [EX.dominadasAsist, EX.jalonPecho] },
     { type: 'slot', slotId: 'd2-pierna', sets: 2, repRange: '10-12', options: [EX.zancadas, EX.prensaPiernas] },
-    { type: 'slot', slotId: 'd2-triceps', sets: 2, repRange: '10-12', options: [EX.tricepsPolea, EX.fondosAsistidos] },
+    { type: 'slot', slotId: 'd2-triceps', sets: 2, repRange: '10-12', options: [EX.tricepsPolea, EX.tricepsSobreCabeza] },
+    { type: 'slot', slotId: 'd2-isquios', sets: 2, repRange: '10-12', options: [EX.curlFemoral, EX.puente] },
   ]},
   3: { label: 'Día 3', exercises: [
     { type: 'slot', slotId: 'd3-pierna', sets: 3, repRange: '8-10', options: [EX.sentadilla, EX.prensaPiernas] },
     { type: 'slot', slotId: 'd3-empuje', sets: 3, repRange: '8-10', options: [EX.pressBanca, EX.pressInclinado] },
     { type: 'slot', slotId: 'd3-tiron', sets: 3, repRange: '8-10', options: [EX.remoMaquina, EX.remoTRX] },
     { type: 'fixed', ex: EX.pressMilitarManc, sets: 2, repRange: '10-12' },
-    { type: 'fixed', ex: EX.superCurlTriceps, sets: 2, repRange: '12' },
+    { type: 'fixed', ex: EX.elevLateral, sets: 2, repRange: '12-15' },
+    { type: 'fixed', ex: EX.curlBiceps, sets: 2, repRange: '12' },
+    { type: 'fixed', ex: EX.tricepsPolea, sets: 2, repRange: '12' },
   ]},
   4: { label: 'Casa', exercises: [
     { type: 'slot', slotId: 'd4-empuje', sets: 3, repRange: '8-15', options: [EX.flexiones, EX.flexionesRodillas] },
@@ -324,6 +333,7 @@ function GymTracker() {
   const [bwDate, setBwDate] = useState(todayISO());
   const [configError, setConfigError] = useState(false);
   const [backdays, setBackdays] = useState([]);
+  const [activity, setActivity] = useState({});
   const [loadError, setLoadError] = useState(null);
   const [restoreOffer, setRestoreOffer] = useState(null);
   const [saveWarn, setSaveWarn] = useState(false);
@@ -337,7 +347,7 @@ function GymTracker() {
     (async () => {
       setLoadError(null);
       try {
-        const [s, bw, bd] = await Promise.all([loadKey('sessions', []), loadKey('bodyweights', []), loadKey('backdays', [])]);
+        const [s, bw, bd, act] = await Promise.all([loadKey('sessions', []), loadKey('bodyweights', []), loadKey('backdays', []), loadKey('activity', {})]);
         const sess = s || []; const bws = bw || [];
         const sl = lsGet('sessions') || []; const bl = lsGet('bodyweights') || [];
         if (sess.length === 0 && bws.length === 0 && (sl.length > 0 || bl.length > 0)) {
@@ -346,8 +356,8 @@ function GymTracker() {
         } else if (sess.length > 0 || bws.length > 0) {
           lsSet('sessions', sess); lsSet('bodyweights', bws);
         }
-        lsSet('backdays', bd || []);
-        setSessions(sess); setBodyweights(bws); setBackdays(bd || []);
+        lsSet('backdays', bd || []); lsSet('activity', act || {});
+        setSessions(sess); setBodyweights(bws); setBackdays(bd || []); setActivity(act || {});
       } catch (e) {
         setLoadError(String((e && e.message) || e));
       }
@@ -374,7 +384,16 @@ function GymTracker() {
     const b = mergeByDate(bodyweights, Array.isArray(data.bodyweights) ? data.bodyweights : []);
     const bd = Array.from(new Set([...(backdays || []), ...(Array.isArray(data.backdays) ? data.backdays : [])])).sort();
     setSessions(s); setBodyweights(b); setBackdays(bd);
-    await persist('sessions', s); await persist('bodyweights', b); await persist('backdays', bd);
+    const act = { ...(data.activity && typeof data.activity === 'object' && !Array.isArray(data.activity) ? data.activity : {}), ...activity };
+    setActivity(act);
+    await persist('sessions', s); await persist('bodyweights', b); await persist('backdays', bd); await persist('activity', act);
+  };
+
+  const handleSaveActivity = async (iso, data) => {
+    const next = { ...activity };
+    if (data) next[iso] = data; else delete next[iso];
+    setActivity(next);
+    return persist('activity', next);
   };
 
   const handleToggleBackToday = async () => {
@@ -532,7 +551,7 @@ function GymTracker() {
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.paperFaint, marginTop: 12, wordBreak: 'break-word' }}>Detalle: {loadError}</div>
           <button onClick={() => { setSessions(null); setBodyweights(null); setLoadTick((t) => t + 1); }} style={styles.saveButton}>REINTENTAR</button>
           {hasLocal && (
-            <button onClick={() => downloadJSON({ app: 'bitacora', exportedAt: new Date().toISOString(), sessions: lsGet('sessions') || [], bodyweights: lsGet('bodyweights') || [], backdays: lsGet('backdays') || [] }, 'bitacora-copia-local.json')}
+            <button onClick={() => downloadJSON({ app: 'bitacora', exportedAt: new Date().toISOString(), sessions: lsGet('sessions') || [], bodyweights: lsGet('bodyweights') || [], backdays: lsGet('backdays') || [], activity: lsGet('activity') || {} }, 'bitacora-copia-local.json')}
               style={{ ...styles.saveButton, background: 'none', border: `1px solid ${COLORS.ironLight}`, color: COLORS.paper, marginTop: 10 }}>
               DESCARGAR COPIA LOCAL DE ESTE DISPOSITIVO
             </button>
@@ -591,10 +610,11 @@ function GymTracker() {
         <ProgressView progressTab={progressTab} setProgressTab={setProgressTab}
           progressExerciseId={progressExerciseId} setProgressExerciseId={setProgressExerciseId} progressData={progressData} progressUnit={progressUnit}
           sessions={sessions} bodyweights={bodyweights} bwInput={bwInput} setBwInput={setBwInput}
-          bwDate={bwDate} setBwDate={setBwDate} handleSaveBodyweight={handleSaveBodyweight} />
+          bwDate={bwDate} setBwDate={setBwDate} handleSaveBodyweight={handleSaveBodyweight}
+          activity={activity} handleSaveActivity={handleSaveActivity} backdays={backdays} />
       )}
       {view === 'back' && <BackView backdays={backdays} onToggleToday={handleToggleBackToday} />}
-      {view === 'guide' && <GuideView sessions={sessions} bodyweights={bodyweights} backdays={backdays} onImport={handleImportBackup} />}
+      {view === 'guide' && <GuideView sessions={sessions} bodyweights={bodyweights} backdays={backdays} activity={activity} onImport={handleImportBackup} />}
     </div>
   );
 }
@@ -827,16 +847,18 @@ function HistoryView({ sessions, expandedHistoryId, setExpandedHistoryId, handle
   );
 }
 
-function ProgressView({ progressTab, setProgressTab, progressExerciseId, setProgressExerciseId, progressData, progressUnit, sessions, bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight }) {
+function ProgressView({ progressTab, setProgressTab, progressExerciseId, setProgressExerciseId, progressData, progressUnit, sessions, bodyweights, bwInput, setBwInput, bwDate, setBwDate, handleSaveBodyweight, activity, handleSaveActivity, backdays }) {
   return (
     <div style={styles.section}>
       <div style={styles.subTabs}>
         <button onClick={() => setProgressTab('dashboard')} style={{ ...styles.subTab, ...(progressTab === 'dashboard' ? styles.subTabActive : {}) }}>Resumen</button>
         <button onClick={() => setProgressTab('exercise')} style={{ ...styles.subTab, ...(progressTab === 'exercise' ? styles.subTabActive : {}) }}>Ejercicio</button>
         <button onClick={() => setProgressTab('bodyweight')} style={{ ...styles.subTab, ...(progressTab === 'bodyweight' ? styles.subTabActive : {}) }}>Peso corporal</button>
+        <button onClick={() => setProgressTab('activity')} style={{ ...styles.subTab, ...(progressTab === 'activity' ? styles.subTabActive : {}) }}>Actividad</button>
       </div>
 
       {progressTab === 'dashboard' && <DashboardTab sessions={sessions} />}
+      {progressTab === 'activity' && <ActivityTab activity={activity} onSave={handleSaveActivity} sessions={sessions} backdays={backdays} />}
 
       {progressTab === 'exercise' && (
         <>
@@ -854,6 +876,139 @@ function ProgressView({ progressTab, setProgressTab, progressExerciseId, setProg
       {progressTab === 'bodyweight' && (
         <BodyweightTab bodyweights={bodyweights} bwInput={bwInput} setBwInput={setBwInput} bwDate={bwDate} setBwDate={setBwDate} handleSaveBodyweight={handleSaveBodyweight} />
       )}
+    </div>
+  );
+}
+
+const STEP_GOAL = 8000;
+const ACT_COLORS = { gym: COLORS_EMBER(), steps: '#7a9b6f', run: '#d9b44a', bike: '#6f8fa8', back: '#a8a294' };
+function COLORS_EMBER() { return '#c65d2e'; }
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function ActivityTab({ activity, onSave, sessions, backdays }) {
+  const [sel, setSel] = useState(todayISO());
+  const [month, setMonth] = useState(todayISO().slice(0, 7));
+  const [steps, setSteps] = useState('');
+  const [walk, setWalk] = useState(false);
+  const [runKm, setRunKm] = useState('');
+  const [runMin, setRunMin] = useState('');
+  const [bikeMin, setBikeMin] = useState('');
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    const r = activity[sel] || {};
+    setSteps(r.steps != null ? String(r.steps) : '');
+    setWalk(!!r.walk);
+    setRunKm(r.run && r.run.km != null ? String(r.run.km) : '');
+    setRunMin(r.run && r.run.min != null ? String(r.run.min) : '');
+    setBikeMin(r.bike != null ? String(r.bike) : '');
+    setMsg('');
+  }, [sel]);
+
+  const doSave = async () => {
+    const data = {};
+    const st = parseInt(steps, 10); if (st > 0) data.steps = st;
+    if (walk) data.walk = true;
+    const km = parseFloat(runKm); const mn = parseFloat(runMin);
+    if (km > 0 || mn > 0) data.run = { km: km > 0 ? km : null, min: mn > 0 ? mn : null };
+    const bk = parseFloat(bikeMin); if (bk > 0) data.bike = bk;
+    const ok = await onSave(sel, Object.keys(data).length ? data : null);
+    setMsg(ok ? '✓ Guardado' : 'Quedó solo en este dispositivo');
+  };
+
+  const [y, m] = month.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(`${month}-${pad2(d)}`);
+  const shiftMonth = (delta) => { const dt = new Date(y, m - 1 + delta, 1); setMonth(`${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}`); };
+  const monthLabel = new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }).toUpperCase();
+  const today = todayISO();
+
+  const dayInfo = (iso) => {
+    const a = activity[iso] || {};
+    return {
+      gym: sessions.some((s) => s.date === iso),
+      steps: (a.steps || 0) >= STEP_GOAL || !!a.walk,
+      run: !!a.run, bike: !!a.bike, back: backdays.includes(iso),
+    };
+  };
+
+  // summaries
+  const last7 = [];
+  for (let i = 0; i < 7; i++) { const dt = new Date(today + 'T00:00:00'); dt.setDate(dt.getDate() - i); last7.push(`${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`); }
+  const withSteps = last7.filter((d) => activity[d] && activity[d].steps > 0);
+  const avgSteps = withSteps.length ? Math.round(withSteps.reduce((a, d) => a + activity[d].steps, 0) / withSteps.length) : 0;
+  const goalDays = last7.filter((d) => (activity[d] && activity[d].steps >= STEP_GOAL) || (activity[d] && activity[d].walk)).length;
+  const monthDates = cells.filter(Boolean);
+  const gymDays = new Set(sessions.filter((s) => s.date.startsWith(month)).map((s) => s.date)).size;
+  const runKmMonth = monthDates.reduce((a, d) => a + ((activity[d] && activity[d].run && activity[d].run.km) || 0), 0);
+
+  const selSessions = sessions.filter((s) => s.date === sel);
+  const info = dayInfo(sel);
+
+  return (
+    <div>
+      <div style={styles.dashGrid}>
+        <div style={styles.dashCard}><span style={styles.dashValue}>{avgSteps ? avgSteps.toLocaleString('es-AR') : '—'}</span><span style={styles.dashLabel}>PASOS PROM. 7 DÍAS</span></div>
+        <div style={styles.dashCard}><span style={styles.dashValue}>{goalDays}/7</span><span style={styles.dashLabel}>DÍAS CON META ({STEP_GOAL.toLocaleString('es-AR')})</span></div>
+        <div style={styles.dashCard}><span style={styles.dashValue}>{gymDays}</span><span style={styles.dashLabel}>DÍAS DE ENTRENO (MES)</span></div>
+        <div style={styles.dashCard}><span style={styles.dashValue}>{Math.round(runKmMonth * 10) / 10}</span><span style={styles.dashLabel}>KM CORRIDOS (MES)</span></div>
+      </div>
+
+      <div style={{ ...styles.chartCard, marginTop: 14 }}>
+        <div style={styles.chartHeaderRow}>
+          <button onClick={() => shiftMonth(-1)} style={styles.warnBtn}>◀</button>
+          <span style={styles.chartLabel}>{monthLabel}</span>
+          <button onClick={() => shiftMonth(1)} style={styles.warnBtn}>▶</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginTop: 10 }}>
+          {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d, i) => <div key={i} style={{ ...styles.chartDate, marginTop: 0 }}>{d}</div>)}
+          {cells.map((iso, i) => {
+            if (!iso) return <div key={i} />;
+            const inf = dayInfo(iso);
+            const isSel = iso === sel; const isToday = iso === today;
+            return (
+              <button key={i} onClick={() => setSel(iso)} style={{ background: isSel ? COLORS.emberDim : COLORS.bgCardAlt, border: `1px solid ${isToday ? COLORS.ember : COLORS.iron}`, color: COLORS.paper, padding: '5px 0 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                <span>{Number(iso.slice(8))}</span>
+                <span style={{ display: 'flex', gap: 2, height: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {inf.gym && <span style={{ width: 6, height: 6, borderRadius: 3, background: ACT_COLORS.gym }} />}
+                  {inf.steps && <span style={{ width: 6, height: 6, borderRadius: 3, background: ACT_COLORS.steps }} />}
+                  {inf.run && <span style={{ width: 6, height: 6, borderRadius: 3, background: ACT_COLORS.run }} />}
+                  {inf.bike && <span style={{ width: 6, height: 6, borderRadius: 3, background: ACT_COLORS.bike }} />}
+                  {inf.back && <span style={{ width: 6, height: 6, borderRadius: 3, background: ACT_COLORS.back }} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 12, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.paperDim }}>
+          <span><span style={{ color: ACT_COLORS.gym }}>●</span> gym</span>
+          <span><span style={{ color: ACT_COLORS.steps }}>●</span> meta pasos</span>
+          <span><span style={{ color: ACT_COLORS.run }}>●</span> correr</span>
+          <span><span style={{ color: ACT_COLORS.bike }}>●</span> bici</span>
+          <span><span style={{ color: ACT_COLORS.back }}>●</span> espalda</span>
+        </div>
+      </div>
+
+      <div style={styles.noteCard}>
+        <span style={styles.noteLabel}>ACTIVIDAD DEL {fmtDate(sel).toUpperCase()}</span>
+        {selSessions.length > 0 && <div style={styles.guideItemText}>Entreno: {selSessions.map((s) => ROUTINE[s.day] ? ROUTINE[s.day].label : 'Sesión').join(', ')}</div>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type="number" inputMode="numeric" value={steps} onChange={(e) => setSteps(e.target.value)} placeholder="Pasos del día" style={styles.noteInput} />
+        </div>
+        <label style={{ ...styles.guideItemText, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type="checkbox" checked={walk} onChange={(e) => setWalk(e.target.checked)} /> Caminé 30 min o más (si no tengo el número de pasos)
+        </label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="number" inputMode="decimal" value={runKm} onChange={(e) => setRunKm(e.target.value)} placeholder="Correr: km" style={styles.noteInput} />
+          <input type="number" inputMode="numeric" value={runMin} onChange={(e) => setRunMin(e.target.value)} placeholder="Correr: min" style={styles.noteInput} />
+        </div>
+        <input type="number" inputMode="numeric" value={bikeMin} onChange={(e) => setBikeMin(e.target.value)} placeholder="Bici (eléctrica o no): minutos" style={styles.noteInput} />
+        <button onClick={doSave} style={{ ...styles.saveButton, marginTop: 4 }}>{msg || 'GUARDAR ACTIVIDAD'}</button>
+        <div style={{ ...styles.guideItemText, fontSize: 12 }}>Dejá todo vacío y guardá para borrar el día. Tocá un día del calendario para verlo o editarlo.</div>
+      </div>
     </div>
   );
 }
@@ -963,10 +1118,10 @@ function downloadJSON(obj, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-function BackupCard({ sessions, bodyweights, backdays, onImport }) {
+function BackupCard({ sessions, bodyweights, backdays, activity, onImport }) {
   const [msg, setMsg] = useState('');
   const doExport = () => {
-    downloadJSON({ app: 'bitacora', version: 1, exportedAt: new Date().toISOString(), sessions, bodyweights, backdays }, `bitacora-backup-${todayISO()}.json`);
+    downloadJSON({ app: 'bitacora', version: 1, exportedAt: new Date().toISOString(), sessions, bodyweights, backdays, activity }, `bitacora-backup-${todayISO()}.json`);
     setMsg('Copia descargada. Guardala en Drive/iCloud o mandatela por mail.');
   };
   const doImport = (e) => {
@@ -1044,7 +1199,7 @@ function BackView({ backdays, onToggleToday }) {
   );
 }
 
-function GuideView({ sessions, bodyweights, backdays, onImport }) {
+function GuideView({ sessions, bodyweights, backdays, activity, onImport }) {
   return (
     <div style={styles.section}>
       <GuideCard title="VOLVER DESPUÉS DE UN PARÓN" subtitle="Si pasaron semanas o meses sin entrenar">
@@ -1075,13 +1230,19 @@ function GuideView({ sessions, bodyweights, backdays, onImport }) {
         <GuideItem>Cada variante lleva su propio historial y gráfico de progreso por separado — no se mezclan entre sí.</GuideItem>
         <GuideItem>Press banca, press inclinado, sentadilla y prensa de piernas comparten historial entre días cuando son el mismo movimiento — así ves su progreso completo sin importar qué día lo hiciste.</GuideItem>
       </GuideCard>
+      <GuideCard title="EJERCICIOS ASISTIDOS Y DE PESO CORPORAL" subtitle="Cómo cargarlos para que el progreso tenga sentido">
+        <GuideItem>Dominadas y fondos asistidos: cargá las <b>reps</b> y dejá el kg vacío (anotá la asistencia en la nota de la sesión). Así el gráfico de reps sube cuando mejorás.</GuideItem>
+        <GuideItem>Remo en TRX y similares: igual, solo reps. Si el gráfico mostraba kg, ahora cambia a reps solo cuando no hay peso cargado.</GuideItem>
+        <GuideItem>Curl y tríceps del Día 3: hacelos seguidos, sin descanso (ahora se registran por separado).</GuideItem>
+      </GuideCard>
       <GuideCard title="OTROS PUNTOS CLAVE" subtitle="Lo que más impacta en tu objetivo">
         <GuideItem>Proteína: apuntá a 160-180g/día.</GuideItem>
         <GuideItem>Déficit calórico leve (10-15%), no agresivo.</GuideItem>
+        <GuideItem>Actividad diaria: apuntá a ~8.000 pasos de promedio semanal. La bici eléctrica suma (con asistencia suele ser actividad liviana-moderada, menos que una bici común), pero no cuenta como pasos: cargala en minutos de bici.</GuideItem>
         <GuideItem>Sueño (7-9h) y reducir alcohol impactan más en grasa abdominal que cualquier suplemento.</GuideItem>
         <GuideItem>La consistencia semanal pesa más que la rutina "perfecta".</GuideItem>
       </GuideCard>
-      <BackupCard sessions={sessions} bodyweights={bodyweights} backdays={backdays} onImport={onImport} />
+      <BackupCard sessions={sessions} bodyweights={bodyweights} backdays={backdays} activity={activity} onImport={onImport} />
     </div>
   );
 }
@@ -1219,5 +1380,4 @@ root.render(<GymTracker />);
 </script>
 </body>
 </html>
-
 
