@@ -21,6 +21,8 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: #141310; }
   #error-box { display:none; position:fixed; inset:0; background:#141310; color:#ff6b4a; font-family: monospace; font-size:13px; padding:20px; white-space:pre-wrap; word-break:break-word; z-index:9999; overflow:auto; line-height:1.6; }
+  @keyframes prFlash { 0% { box-shadow: 0 0 0 0 rgba(198,93,46,0.9); } 100% { box-shadow: 0 0 0 28px rgba(198,93,46,0); } }
+  .pr-flash { animation: prFlash 1s ease-out 2; }
 </style>
 <script>
   function showError(msg) {
@@ -66,7 +68,7 @@
 </script>
 
 <script type="text/babel" data-presets="react">
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 const SUPABASE_URL = "https://mvhyzbhveathjsqkvhgl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12aHl6Ymh2ZWF0aGpzcWt2aGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTc5NDYsImV4cCI6MjEwMjg5Mzk0Nn0.iANXf-9VNPHdYaJKR8PO8fCniUY7RCl3w-2O55ctjj4";
@@ -76,6 +78,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // ---- Storage helpers (Supabase table "kv_store": key text, value jsonb) + local copy on this device ----
 const LS_PREFIX = 'bitacora_';
 function lsSet(k, v) { try { localStorage.setItem(LS_PREFIX + k, JSON.stringify(v)); } catch (e) {} }
+function lsDel(k) { try { localStorage.removeItem(LS_PREFIX + k); } catch (e) {} }
 function lsGet(k) { try { const r = localStorage.getItem(LS_PREFIX + k); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
 
 function withTimeout(promise, ms) {
@@ -315,6 +318,110 @@ function lastPerformance(sessions, exId) {
   return null;
 }
 
+function hasEntryData(entries) {
+  return Object.values(entries || {}).some((sets) => (sets || []).some((x) => x.weight !== '' || x.reps !== ''));
+}
+const fmtKg = (x) => String(Math.round(x * 100) / 100).replace('.', ',');
+const roundTo = (x, step) => Math.round(x / step) * step;
+function fmtElapsed(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+  return (h > 0 ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(sec).padStart(2, '0');
+}
+function parseRange(rr) {
+  const m = /(\d+)\s*-\s*(\d+)/.exec(rr || '');
+  if (m) return [Number(m[1]), Number(m[2])];
+  const n = /(\d+)/.exec(rr || '');
+  if (n) return [Number(n[1]), Number(n[1])];
+  return null;
+}
+function lastSetsOf(sessions, exId) {
+  for (const s of sessions) {
+    if (s.entries[exId]) {
+      const filled = s.entries[exId].some((x) => x.weight !== '' || x.reps !== '');
+      if (filled) return s.entries[exId];
+    }
+  }
+  return [];
+}
+// Doble progresión: si completás todas las series en el tope del rango -> subís peso; si no, sumás reps con el mismo peso.
+function suggestNext(sessions, exId, sets, repRange) {
+  const range = parseRange(repRange);
+  if (!range || exId === 'core-opcional') return null;
+  const lo = range[0], hi = range[1];
+  const hist = [];
+  for (const s of sessions) {
+    if (!s.entries[exId]) continue;
+    const filled = s.entries[exId].filter((x) => (parseFloat(x.reps) || 0) > 0);
+    if (filled.length) hist.push({ date: s.date, sets: filled.map((x) => ({ w: parseFloat(x.weight) || 0, r: parseFloat(x.reps) || 0 })) });
+  }
+  if (!hist.length) return { text: 'Sin historial todavía: empezá liviano, dejando 2-3 reps en reserva.' };
+  const last = hist[0];
+  const W = Math.max(...last.sets.map((x) => x.w));
+  const reps = last.sets.map((x) => x.r);
+  const minR = Math.min(...reps);
+  const days = daysBetween(last.date, todayISO());
+  const desc = W > 0 ? `${fmtKg(W)} kg × ${reps.join('/')}` : `${reps.join('/')} reps`;
+  if (days >= 21) {
+    if (W > 0) {
+      const w = Math.max(2.5, roundTo(W * 0.65, 2.5));
+      return { text: `Pasaron ${days} días desde la última vez (${desc}). Volvé con ~65%: ${fmtKg(w)} kg, ${Math.min(2, sets)} series, sin llegar al límite.`, weight: w };
+    }
+    return { text: `Pasaron ${days} días (${desc}). Volvé con ~2 series, dejando 3 reps en reserva.` };
+  }
+  if (W === 0) {
+    const atTop = reps.length >= sets && reps.every((r) => r >= hi);
+    if (atTop) return { text: `Última vez ${desc}: tope del rango (${hi}) en todas → pasá a una variante más difícil o sumá peso (mochila).` };
+    return { text: `Última vez ${desc}. Sumá 1 rep por serie: apuntá a ${Math.min(hi, minR + 1)}+ en todas.` };
+  }
+  const atW = last.sets.filter((x) => x.w === W);
+  const allTop = atW.length >= sets && atW.every((x) => x.r >= hi);
+  if (allTop) {
+    const w = W + (W >= 40 ? 5 : 2.5);
+    return { text: `Última vez ${desc}: tope del rango en todas las series → subí a ${fmtKg(w)} kg y apuntá a ${lo}+ reps.`, weight: w };
+  }
+  if (atW.some((x) => x.r < lo)) {
+    const prev = hist[1];
+    const prevW = prev ? Math.max(...prev.sets.map((x) => x.w)) : 0;
+    const prevMissed = prev && prevW >= W && prev.sets.filter((x) => x.w === prevW).some((x) => x.r < lo);
+    if (prevMissed) {
+      const w = Math.max(2.5, roundTo(W * 0.9, 2.5));
+      return { text: `Dos sesiones seguidas por debajo de ${lo} reps con ${fmtKg(W)} kg → bajá a ${fmtKg(w)} kg (~10%) y recuperá reps.`, weight: w };
+    }
+    return { text: `Última vez ${desc}: quedaste por debajo de ${lo} reps. Repetí ${fmtKg(W)} kg y apuntá a ${lo}+ en todas.`, weight: W };
+  }
+  return { text: `Última vez ${desc}. Repetí ${fmtKg(W)} kg y sumá reps: apuntá a ${Math.min(hi, minR + 1)}+ en cada serie (al llegar a ${hi} en todas, subís peso).`, weight: W };
+}
+function bestOf(sets) {
+  const f = (sets || []).filter((x) => (parseFloat(x.reps) || 0) > 0 || (parseFloat(x.weight) || 0) > 0);
+  if (!f.length) return null;
+  const W = Math.max(...f.map((x) => parseFloat(x.weight) || 0));
+  const R = W > 0 ? Math.max(...f.filter((x) => (parseFloat(x.weight) || 0) === W).map((x) => parseFloat(x.reps) || 0)) : Math.max(...f.map((x) => parseFloat(x.reps) || 0));
+  return { W, R };
+}
+function buildSummary(all, date, day, cleaned, durationMin) {
+  const others = all.filter((s) => !(s.date === date && s.day === day));
+  const out = { prs: [], progressed: [], same: [], lower: [], nuevos: [], durationMin, setsDone: 0 };
+  Object.entries(cleaned).forEach(([exId, sets]) => {
+    out.setsDone += sets.filter((x) => x.weight !== '' || x.reps !== '').length;
+    if (exId === 'core-opcional') return;
+    const cur = bestOf(sets);
+    if (!cur) return;
+    const name = (EXERCISE_BY_ID[exId] && EXERCISE_BY_ID[exId].name) || exId;
+    const prevAll = others.filter((s) => s.entries[exId]).map((s) => bestOf(s.entries[exId])).filter(Boolean);
+    if (!prevAll.length) { out.nuevos.push(name); return; }
+    const prevSess = others.find((s) => s.date < date && s.entries[exId] && bestOf(s.entries[exId]));
+    const isPR = cur.W > 0 ? cur.W > Math.max(...prevAll.map((b) => b.W)) : cur.R > Math.max(...prevAll.map((b) => b.R));
+    if (isPR) out.prs.push(name);
+    if (!prevSess) return;
+    const pb = bestOf(prevSess.entries[exId]);
+    if (cur.W > pb.W || (cur.W === pb.W && cur.R > pb.R)) { if (!isPR) out.progressed.push(name); }
+    else if (cur.W === pb.W && cur.R === pb.R) out.same.push(name);
+    else out.lower.push(name);
+  });
+  return out;
+}
+
 function GymTracker() {
   const [sessions, setSessions] = useState(null);
   const [bodyweights, setBodyweights] = useState(null);
@@ -338,6 +445,11 @@ function GymTracker() {
   const [restoreOffer, setRestoreOffer] = useState(null);
   const [saveWarn, setSaveWarn] = useState(false);
   const [loadTick, setLoadTick] = useState(0);
+  const [startedAt, setStartedAt] = useState(null);
+  const [now, setNow] = useState(Date.now());
+  const [summary, setSummary] = useState(null);
+  const [draftOffer, setDraftOffer] = useState(null);
+  const skipResetRef = useRef(false);
 
   useEffect(() => {
     if (SUPABASE_URL.includes('PEGA_ACA') || SUPABASE_ANON_KEY.includes('PEGA_ACA')) {
@@ -358,6 +470,8 @@ function GymTracker() {
         }
         lsSet('backdays', bd || []); lsSet('activity', act || {});
         setSessions(sess); setBodyweights(bws); setBackdays(bd || []); setActivity(act || {});
+        const dr = lsGet('draft');
+        if (dr && dr.entries && hasEntryData(dr.entries)) setDraftOffer(dr);
       } catch (e) {
         setLoadError(String((e && e.message) || e));
       }
@@ -404,15 +518,60 @@ function GymTracker() {
   };
 
   useEffect(() => {
+    if (skipResetRef.current) { skipResetRef.current = false; return; }
     if (editingSessionId) return;
     const defaults = defaultSelectedVariants(selectedDay);
     setSelectedVariants(defaults);
     setEntries(emptyLogForDay(selectedDay, defaults));
     setNote('');
     setSaved(false);
+    setStartedAt(null);
+    setSummary(null);
   }, [selectedDay]);
 
+  // cronómetro de la sesión
+  useEffect(() => {
+    if (!startedAt || saved) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [startedAt, saved]);
+
+  // autoguardado de borrador en este dispositivo
+  useEffect(() => {
+    if (sessions === null || draftOffer || editingSessionId) return;
+    if (!hasEntryData(entries)) return;
+    lsSet('draft', { day: selectedDay, date, variants: selectedVariants, entries, note, startedAt, savedAt: Date.now() });
+  }, [entries, note, selectedVariants, selectedDay, date, startedAt]);
+
+  const handleRestoreDraft = () => {
+    const d = draftOffer;
+    if (!d) return;
+    if (d.day !== selectedDay) skipResetRef.current = true;
+    setSelectedDay(d.day);
+    setDate(d.date || todayISO());
+    setSelectedVariants(d.variants || defaultSelectedVariants(d.day));
+    setEntries(d.entries);
+    setNote(d.note || '');
+    setStartedAt(d.startedAt || null);
+    setNow(Date.now());
+    setSaved(false);
+    setSummary(null);
+    setDraftOffer(null);
+    setView('log');
+  };
+  const handleDiscardDraft = () => { lsDel('draft'); setDraftOffer(null); };
+
+  const applySuggestion = (exId, w) => {
+    setEntries((prev) => (prev[exId] ? { ...prev, [exId]: prev[exId].map((x) => ({ ...x, weight: String(w) })) } : prev));
+    setSaved(false);
+  };
+  const copyLast = (exId, lastSets) => {
+    setEntries((prev) => (prev[exId] ? { ...prev, [exId]: prev[exId].map((x, i) => (lastSets[i] ? { weight: lastSets[i].weight ?? '', reps: lastSets[i].reps ?? '' } : x)) } : prev));
+    setSaved(false);
+  };
+
   const updateSet = (exId, setIdx, field, value) => {
+    if (value !== '' && !editingSessionId) setStartedAt((t) => t || Date.now());
     setEntries((prev) => ({
       ...prev,
       [exId]: prev[exId].map((s, i) => (i === setIdx ? { ...s, [field]: value } : s)),
@@ -443,25 +602,32 @@ function GymTracker() {
     });
     if (!hasData) return;
 
+    const dur = startedAt && !editingSessionId ? Math.round((Date.now() - startedAt) / 60000) : null;
+    const durationMin = dur && dur > 0 && dur < 360 ? dur : null;
     let next;
     if (editingSessionId) {
-      next = (sessions || []).map((s) => s.id === editingSessionId ? { ...s, date, day: selectedDay, entries: cleaned, note: note.trim() } : s);
+      next = (sessions || []).map((s) => s.id === editingSessionId ? { ...s, date, day: selectedDay, entries: cleaned, note: note.trim(), durationMin: durationMin ?? s.durationMin } : s);
     } else {
       const existingIdx = (sessions || []).findIndex((s) => s.date === date && s.day === selectedDay);
       if (existingIdx !== -1) {
-        next = (sessions || []).map((s, i) => i === existingIdx ? { ...s, entries: cleaned, note: note.trim() || s.note } : s);
+        next = (sessions || []).map((s, i) => i === existingIdx ? { ...s, entries: cleaned, note: note.trim() || s.note, durationMin: durationMin ?? s.durationMin } : s);
       } else {
-        next = [{ id: `${date}-${selectedDay}-${Date.now()}`, date, day: selectedDay, entries: cleaned, note: note.trim() }, ...(sessions || [])];
+        next = [{ id: `${date}-${selectedDay}-${Date.now()}`, date, day: selectedDay, entries: cleaned, note: note.trim(), durationMin }, ...(sessions || [])];
       }
     }
     next = next.sort((a, b) => (a.date < b.date ? 1 : -1));
     setSessions(next);
+    setNow(Date.now());
+    setSummary(buildSummary(next, date, selectedDay, cleaned, durationMin));
     const ok = await persist('sessions', next);
+    if (ok) lsDel('draft');
     setSaved(ok);
   };
 
   const handleEditSession = (session) => {
     setEditingSessionId(session.id);
+    setStartedAt(null);
+    setSummary(null);
     setDate(session.date);
     setSelectedDay(session.day);
     const defaults = defaultSelectedVariants(session.day);
@@ -497,6 +663,8 @@ function GymTracker() {
 
   const handleCancelEdit = () => {
     setEditingSessionId(null);
+    setStartedAt(null);
+    setSummary(null);
     const defaults = defaultSelectedVariants(selectedDay);
     setSelectedVariants(defaults);
     setEntries(emptyLogForDay(selectedDay, defaults));
@@ -578,6 +746,15 @@ function GymTracker() {
       {saveWarn && (
         <div style={styles.warnBanner}>⚠ No se pudo guardar en la nube (quedó una copia en este dispositivo). Revisá la conexión o si Supabase está pausado y volvé a guardar.</div>
       )}
+      {draftOffer && (
+        <div style={styles.warnBanner}>
+          Tenés un borrador sin guardar ({ROUTINE[draftOffer.day] ? ROUTINE[draftOffer.day].label : 'sesión'} · {draftOffer.date ? fmtDate(draftOffer.date) : ''}).
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={handleRestoreDraft} style={styles.warnBtn}>RECUPERAR</button>
+            <button onClick={handleDiscardDraft} style={styles.warnBtn}>DESCARTAR</button>
+          </div>
+        </div>
+      )}
       {restoreOffer && (
         <div style={styles.warnBanner}>
           La base está vacía pero este dispositivo tiene una copia con {(restoreOffer.sessions || []).length} sesiones.
@@ -600,7 +777,8 @@ function GymTracker() {
         <LogView date={date} setDate={setDate} selectedDay={selectedDay} setSelectedDay={setSelectedDay}
           entries={entries} updateSet={updateSet} note={note} setNote={setNote} handleSave={handleSave}
           saved={saved} sessions={sessions} editingSessionId={editingSessionId} handleCancelEdit={handleCancelEdit}
-          selectedVariants={selectedVariants} switchVariant={switchVariant} />
+          selectedVariants={selectedVariants} switchVariant={switchVariant}
+          elapsed={startedAt ? fmtElapsed(now - startedAt) : null} summary={summary} applySuggestion={applySuggestion} copyLast={copyLast} />
       )}
       {view === 'history' && (
         <HistoryView sessions={sessions} expandedHistoryId={expandedHistoryId}
@@ -646,7 +824,25 @@ function ExerciseInfoLinks({ ex }) {
   );
 }
 
-function SetInputs({ ex, sets, entries, updateSet }) {
+function SuggestBox({ sug, exId, lastSets, applySuggestion, copyLast }) {
+  if (!sug) return null;
+  const hasLast = lastSets.length > 0;
+  return (
+    <div style={styles.suggestBox}>
+      <span style={styles.suggestLabel}>HOY</span>
+      <span style={styles.suggestText}>{sug.text}</span>
+      {(sug.weight || hasLast) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {sug.weight ? <button onClick={() => applySuggestion(exId, sug.weight)} style={styles.warnBtn}>USAR {fmtKg(sug.weight)} KG</button> : null}
+          {hasLast ? <button onClick={() => copyLast(exId, lastSets)} style={styles.warnBtn}>COPIAR ÚLTIMA VEZ</button> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SetInputs({ ex, sets, entries, updateSet, lastSets }) {
+  const ls = lastSets || [];
   return (
     <div style={styles.setsGrid}>
       <div style={styles.setsGridHeader}>
@@ -655,15 +851,15 @@ function SetInputs({ ex, sets, entries, updateSet }) {
       {entries[ex.id]?.map((set, setIdx) => (
         <div key={setIdx} style={styles.setRow}>
           <span style={styles.setLabel}>Serie {setIdx + 1}</span>
-          <input type="number" inputMode="decimal" value={set.weight} onChange={(e) => updateSet(ex.id, setIdx, 'weight', e.target.value)} placeholder="—" style={styles.setInput} />
-          <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(ex.id, setIdx, 'reps', e.target.value)} placeholder="—" style={styles.setInput} />
+          <input type="number" inputMode="decimal" value={set.weight} onChange={(e) => updateSet(ex.id, setIdx, 'weight', e.target.value)} placeholder={ls[setIdx] && ls[setIdx].weight ? String(ls[setIdx].weight) : '—'} style={styles.setInput} />
+          <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(ex.id, setIdx, 'reps', e.target.value)} placeholder={ls[setIdx] && ls[setIdx].reps ? String(ls[setIdx].reps) : '—'} style={styles.setInput} />
         </div>
       ))}
     </div>
   );
 }
 
-function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSet, note, setNote, handleSave, saved, sessions, editingSessionId, handleCancelEdit, selectedVariants, switchVariant }) {
+function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSet, note, setNote, handleSave, saved, sessions, editingSessionId, handleCancelEdit, selectedVariants, switchVariant, elapsed, summary, applySuggestion, copyLast }) {
   const day = ROUTINE[selectedDay];
   return (
     <div style={styles.section}>
@@ -673,6 +869,7 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
           <button onClick={handleCancelEdit} style={styles.editBannerCancel}>Cancelar</button>
         </div>
       )}
+      {elapsed && <div style={styles.elapsed}>⏱ SESIÓN {elapsed}</div>}
       <div style={styles.controlsRow}>
         <div style={styles.dayTabs}>
           {Object.keys(ROUTINE).map(Number).map((d) => (
@@ -709,7 +906,8 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
                     <span style={styles.lastPerfValue}>{fmtPerf(last)} · {fmtDateShort(last.date)}</span>
                   </div>
                 )}
-                <SetInputs ex={ex} sets={item.sets} entries={entries} updateSet={updateSet} />
+                <SuggestBox sug={suggestNext(sessions, ex.id, item.sets, item.repRange)} exId={ex.id} lastSets={lastSetsOf(sessions, ex.id)} applySuggestion={applySuggestion} copyLast={copyLast} />
+                <SetInputs ex={ex} sets={item.sets} entries={entries} updateSet={updateSet} lastSets={lastSetsOf(sessions, ex.id)} />
               </div>
             );
           }
@@ -740,7 +938,8 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
                   <span style={styles.lastPerfValue}>{fmtPerf(last)} · {fmtDateShort(last.date)}</span>
                 </div>
               )}
-              <SetInputs ex={currentEx} sets={item.sets} entries={entries} updateSet={updateSet} />
+              <SuggestBox sug={suggestNext(sessions, currentEx.id, item.sets, item.repRange)} exId={currentEx.id} lastSets={lastSetsOf(sessions, currentEx.id)} applySuggestion={applySuggestion} copyLast={copyLast} />
+              <SetInputs ex={currentEx} sets={item.sets} entries={entries} updateSet={updateSet} lastSets={lastSetsOf(sessions, currentEx.id)} />
             </div>
           );
         })}
@@ -774,6 +973,17 @@ function LogView({ date, setDate, selectedDay, setSelectedDay, entries, updateSe
         <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: me costó la última serie, subir peso próxima vez..." style={styles.noteInput} rows={2} />
       </div>
 
+      {saved && summary && (
+        <div className={summary.prs.length ? 'pr-flash' : ''} style={styles.summaryCard}>
+          <div style={styles.summaryTitle}>RESUMEN DE LA SESIÓN</div>
+          <div style={styles.summaryLine}>{summary.setsDone} series registradas{summary.durationMin ? ` · ${summary.durationMin} min` : ''}</div>
+          {summary.prs.length > 0 && <div style={{ ...styles.summaryLine, color: COLORS.ember, fontWeight: 700 }}>★ RÉCORD: {summary.prs.join(', ')}</div>}
+          {summary.progressed.length > 0 && <div style={styles.summaryLine}>↑ Mejoraron: {summary.progressed.join(', ')}</div>}
+          {summary.same.length > 0 && <div style={styles.summaryLine}>= Igual que la última vez: {summary.same.join(', ')}</div>}
+          {summary.lower.length > 0 && <div style={styles.summaryLine}>↓ Por debajo de la última vez: {summary.lower.join(', ')}</div>}
+          {summary.nuevos.length > 0 && <div style={styles.summaryLine}>Primera vez registrado: {summary.nuevos.join(', ')}</div>}
+        </div>
+      )}
       <button onClick={handleSave} style={styles.saveButton}>
         {saved ? `✓ ${editingSessionId ? 'CAMBIOS GUARDADOS' : 'GUARDADO'}` : (editingSessionId ? 'GUARDAR CAMBIOS' : 'GUARDAR SESIÓN')}
       </button>
@@ -798,7 +1008,7 @@ function HistoryView({ sessions, expandedHistoryId, setExpandedHistoryId, handle
               <button style={styles.historyCardHeader} onClick={() => setExpandedHistoryId(isOpen ? null : s.id)}>
                 <div style={styles.historyCardLeft}>
                   <span style={styles.historyDayTag}>{ROUTINE[s.day].label}</span>
-                  <span style={styles.historyDate}>{fmtDate(s.date)}</span>
+                  <span style={styles.historyDate}>{fmtDate(s.date)}{s.durationMin ? ` · ${s.durationMin} min` : ''}</span>
                 </div>
                 <div style={styles.historyCardRight}>
                   <span style={styles.historyExCount}>{exCount} ejerc.</span>
@@ -1338,6 +1548,13 @@ const styles = {
   historyConfirmText: { fontSize: 12, color: COLORS.paperDim, marginRight: 4 },
   subTabs: { display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' },
   subTab: { display: 'flex', alignItems: 'center', gap: 6, background: COLORS.bgCard, border: `1px solid ${COLORS.iron}`, color: COLORS.paperDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '8px 12px', cursor: 'pointer', letterSpacing: '0.03em' },
+  suggestBox: { background: COLORS.bgCardAlt, borderLeft: `3px solid ${COLORS.ember}`, padding: '8px 10px', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 },
+  suggestLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: COLORS.ember },
+  suggestText: { fontSize: 13, color: COLORS.paper, lineHeight: 1.45 },
+  summaryCard: { background: COLORS.bgCard, border: `1px solid ${COLORS.ember}`, padding: 14, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 },
+  summaryTitle: { fontSize: 15, fontWeight: 700, letterSpacing: '0.05em', color: COLORS.paper },
+  summaryLine: { fontSize: 13.5, color: COLORS.paperDim, lineHeight: 1.5 },
+  elapsed: { fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.ember, marginBottom: 12, letterSpacing: '0.06em' },
   warnBanner: { margin: '14px 20px 0', background: COLORS.emberDim, color: COLORS.paper, padding: '10px 14px', fontSize: 13, lineHeight: 1.5 },
   warnBtn: { background: 'none', border: `1px solid ${COLORS.paper}`, color: COLORS.paper, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, padding: '6px 10px', cursor: 'pointer' },
   subTabActive: { background: COLORS.ember, borderColor: COLORS.ember, color: '#1a1410', fontWeight: 700 },
@@ -1380,4 +1597,3 @@ root.render(<GymTracker />);
 </script>
 </body>
 </html>
-
